@@ -76,32 +76,27 @@ private struct PowerSummary: View {
 
     var body: some View {
         let power = reading.power
-        HStack(spacing: 12) {
-            if let watts = power?.adapterWatts {
-                item("powerplug.fill", .green, "\(watts) W", help: power?.adapterName ?? "Adapter")
-            }
-            if let input = power?.inputPower, power?.adapterWatts != nil {
-                item("arrow.down.to.line", .orange, "In \(PowerFormat.watts(input))", help: "Power drawn from the adapter")
+        let attached = (reading.chargerAttached ?? reading.adapterConnected) && power?.adapterWatts != nil
+        HStack(spacing: 5) {
+            Image(systemName: attached ? "powerplug.fill" : "battery.75percent")
+                .foregroundStyle(attached ? .green : .secondary)
+            if attached, let watts = power?.adapterWatts {
+                Text("\(watts) W adapter").help(power?.adapterName ?? "Adapter")
+                if let input = power?.inputPower {
+                    Text("·")
+                    Text("In \(PowerFormat.watts(input))").help("Power drawn from the adapter")
+                }
             }
             if let battery = reading.batteryPower {
-                item(battery >= 0 ? "battery.100percent.bolt" : "battery.50percent",
-                     battery > 0.05 ? .yellow : (battery < -0.05 ? .blue : .secondary),
-                     PowerFormat.watts(battery, signed: true),
-                     help: "Battery power: positive while charging, negative while draining")
+                if attached { Text("·") }
+                Text("Battery \(PowerFormat.watts(battery, signed: true))")
+                    .foregroundStyle(battery > 0.05 ? .orange : (battery < -0.05 ? .blue : .secondary))
+                    .help("Positive while charging, negative while draining")
             }
         }
         .font(.caption)
+        .foregroundStyle(.secondary)
         .monospacedDigit()
-    }
-
-    private func item(_ symbol: String, _ tint: Color, _ text: String, help: String) -> some View {
-        Label {
-            Text(text).foregroundStyle(.secondary)
-        } icon: {
-            Image(systemName: symbol).foregroundStyle(tint)
-        }
-        .labelStyle(.titleAndIcon)
-        .help(help)
     }
 }
 
@@ -114,11 +109,7 @@ private struct LimitSlider: View {
         let enabled = model.status?.capabilities.chargingControl == true
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Label {
-                    Text("Charge Limit").font(.subheadline.weight(.medium))
-                } icon: {
-                    Image(systemName: "gauge.with.dots.needle.67percent").foregroundStyle(.green)
-                }
+                Text("Charge Limit").font(.subheadline.weight(.medium))
                 Spacer()
                 Text(model.draftLimit >= 100 ? "Off (100%)" : "\(model.draftLimit)%")
                     .monospacedDigit()
@@ -151,61 +142,32 @@ private struct ActionButtons: View {
             HStack(spacing: 8) {
                 if !model.settings.automaticDischarge {
                     let active = status.session.dischargeRequested
-                    Button { model.toggleDischarge() } label: {
-                        Label {
-                            Text(active ? "Stop Discharge" : "Discharge")
-                        } icon: {
-                            Image(systemName: active ? "stop.circle.fill" : "arrow.down.circle.fill")
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                    .disabled(!active && !model.canStartDischarge)
-                    .help("Drain the battery to the limit while plugged in")
+                    Button(active ? "Stop Discharge" : "Discharge") { model.toggleDischarge() }
+                        .disabled(!active && !model.canStartDischarge)
+                        .help("Drain the battery to the limit while plugged in")
                 }
                 let topUp = status.session.topUpActive
-                Button { model.toggleTopUp() } label: {
-                    Label {
-                        Text(topUp ? "Cancel Top Up" : "Top Up")
-                    } icon: {
-                        Image(systemName: topUp ? "xmark.circle.fill" : "bolt.circle.fill")
-                            .foregroundStyle(.orange)
-                    }
-                }
-                .disabled(!topUp && !model.canTopUp)
-                .help("Charge to 100% once; the limit returns after you unplug")
+                Button(topUp ? "Cancel Top Up" : "Top Up") { model.toggleTopUp() }
+                    .disabled(!topUp && !model.canTopUp)
+                    .help("Charge to 100% once; the limit returns after you unplug")
             }
             .controlSize(.regular)
 
-            SettingToggle(title: "Automatic Discharge", symbol: "arrow.down.circle", tint: .blue,
-                          isOn: model.settings.automaticDischarge, set: model.setAutomaticDischarge)
+            settingToggle("Automatic Discharge", isOn: model.settings.automaticDischarge,
+                          set: model.setAutomaticDischarge)
                 .disabled(!status.capabilities.adapterControl)
                 .help("Discharge automatically whenever the battery is above the limit while plugged in")
 
-            SettingToggle(title: "Sailing Mode", symbol: "sailboat", tint: .teal,
-                          isOn: model.settings.sailingMode, set: model.setSailingMode)
+            settingToggle("Sailing Mode", isOn: model.settings.sailingMode, set: model.setSailingMode)
                 .disabled(!status.capabilities.chargingControl || model.settings.limit >= 100)
                 .help("Below the limit, only charge again once the battery drops \(ChargeSettings.sailingGap)% under it")
         }
     }
-}
 
-private struct SettingToggle: View {
-    let title: String
-    let symbol: String
-    let tint: Color
-    let isOn: Bool
-    let set: (Bool) -> Void
-
-    var body: some View {
-        Toggle(isOn: Binding(get: { isOn }, set: set)) {
-            Label {
-                Text(title)
-            } icon: {
-                Image(systemName: symbol).foregroundStyle(tint)
-            }
-        }
-        .toggleStyle(.switch)
-        .controlSize(.small)
+    private func settingToggle(_ title: String, isOn: Bool, set: @escaping (Bool) -> Void) -> some View {
+        Toggle(title, isOn: Binding(get: { isOn }, set: set))
+            .toggleStyle(.switch)
+            .controlSize(.small)
     }
 }
 

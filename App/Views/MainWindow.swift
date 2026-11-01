@@ -49,15 +49,15 @@ private struct BatteryPage: View {
             if let r = model.status?.reading {
                 Section {
                     if let apple = model.systemMaximumCapacity {
-                        row("Maximum capacity", "heart.fill", .pink, "\(apple)%",
+                        row("Maximum capacity", "\(apple)%",
                             help: "As shown in System Settings › Battery › Battery Health")
                     }
-                    row("Raw capacity", "heart.text.square", .pink, rawCapacity(r),
+                    row("Raw capacity", rawCapacity(r),
                         help: "Full-charge capacity reported by the battery, relative to its design capacity")
-                    row("Cycle count", "arrow.triangle.2.circlepath", .purple, "\(r.cycleCount)")
-                    row("Current", "waveform.path.ecg", .orange, "\(r.amperage) mA")
+                    row("Cycle count", "\(r.cycleCount)")
+                    row("Current", "\(r.amperage) mA")
                     if let mV = r.power?.batteryVoltage {
-                        row("Voltage", "bolt.horizontal", .yellow, PowerFormat.volts(mV))
+                        row("Voltage", PowerFormat.volts(mV))
                     }
                 } header: {
                     Label("Battery", systemImage: "battery.75percent")
@@ -65,26 +65,23 @@ private struct BatteryPage: View {
                 Section {
                     let p = r.power
                     let attached = r.chargerAttached ?? r.adapterConnected
-                    row("Charger", "powerplug.fill", attached ? .green : .secondary,
-                        attached ? (p?.adapterName ?? "Connected") : "Not connected")
+                    row("Charger", attached ? (p?.adapterName ?? "Connected") : "Not connected")
                     if attached {
                         if let watts = p?.adapterWatts {
-                            row("Adapter power", "bolt.fill", .green, "\(watts) W",
+                            row("Adapter power", "\(watts) W",
                                 help: "Power negotiated between the adapter and the Mac")
                         }
                         if let mV = p?.adapterVoltage, let mA = p?.adapterCurrent {
-                            row("Adapter rating", "dial.medium", .teal,
-                                "\(PowerFormat.volts(mV)) · \(PowerFormat.amps(mA))")
+                            row("Adapter rating", "\(PowerFormat.volts(mV)) · \(PowerFormat.amps(mA))")
                         }
                         if let input = p?.inputPower {
-                            row("Power in", "arrow.down.to.line", .orange, PowerFormat.watts(input),
+                            row("Power in", PowerFormat.watts(input),
                                 help: "Power currently drawn from the adapter")
                         }
                     }
                     if let battery = r.batteryPower {
-                        row("Battery power", battery >= 0 ? "battery.100percent.bolt" : "battery.50percent",
-                            battery > 0.05 ? .yellow : (battery < -0.05 ? .blue : .secondary),
-                            PowerFormat.watts(battery, signed: true),
+                        row("Battery power", PowerFormat.watts(battery, signed: true),
+                            tint: battery > 0.05 ? .orange : (battery < -0.05 ? .blue : nil),
                             help: "Positive while charging, negative while draining")
                     }
                 } header: {
@@ -110,15 +107,11 @@ private struct BatteryPage: View {
         .navigationTitle("Battery")
     }
 
-    private func row(_ title: String, _ symbol: String, _ tint: Color, _ value: String, help: String? = nil) -> some View {
-        LabeledContent {
-            Text(value).monospacedDigit()
-        } label: {
-            Label {
-                Text(title)
-            } icon: {
-                Image(systemName: symbol).foregroundStyle(tint)
-            }
+    private func row(_ title: String, _ value: String, tint: Color? = nil, help: String? = nil) -> some View {
+        LabeledContent(title) {
+            Text(value)
+                .monospacedDigit()
+                .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
         }
         .help(help ?? "")
     }

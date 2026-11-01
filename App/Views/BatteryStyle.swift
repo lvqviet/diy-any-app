@@ -35,8 +35,7 @@ enum BatteryStyle {
 
     static func color(_ status: HelperStatus) -> Color {
         switch status.mode {
-        case .charging: return .yellow
-        case .toppingUp: return .orange
+        case .charging, .toppingUp: return .orange
         case .holding, .unlimited: return .green
         case .sailing: return .teal
         case .discharging: return .blue
@@ -60,7 +59,7 @@ enum BatteryStyle {
         case .unlimited: return status.reading?.isCharging == true ? "bolt.fill" : "powerplug.fill"
         case .holding: return "powerplug.fill"
         case .sailing: return "sailboat.fill"
-        case .discharging: return "arrow.down.circle.fill"
+        case .discharging: return "bolt.slash.fill"
         case .unsupported: return "xmark.octagon.fill"
         case .onBattery: return batterySymbol(status.reading?.percent ?? 100)
         }
@@ -68,7 +67,7 @@ enum BatteryStyle {
 
     /// Whether the mode is actively moving charge, used to animate its icon.
     static func isActive(_ mode: ChargeMode) -> Bool {
-        mode == .charging || mode == .toppingUp || mode == .discharging
+        mode == .charging || mode == .toppingUp
     }
 
     /// Monochrome menu bar symbol.
@@ -83,7 +82,7 @@ enum BatteryStyle {
         case .sailing:
             return "sailboat"
         case .discharging:
-            return "arrow.down.circle"
+            return "bolt.slash"
         default:
             return batterySymbol(status.reading?.percent ?? 100)
         }
