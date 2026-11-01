@@ -19,12 +19,15 @@ final class BatteryModel {
 
     private static let limitKey = "battery.limit"
     private static let autoDischargeKey = "battery.automaticDischarge"
+    private static let sailingModeKey = "battery.sailingMode"
     private static let competingAppBundleIDs = ["com.apphousekitchen.aldente-pro", "com.apphousekitchen.aldente"]
 
     private(set) var helperState: HelperState = .connecting
     private(set) var status: HelperStatus?
     private(set) var lastError: String?
     private(set) var competingAppRunning = false
+    /// Maximum Capacity as shown in System Settings (computed by macOS).
+    private(set) var systemMaximumCapacity: Int?
 
     /// Limit shown on the slider while dragging; committed with `commitLimit()`.
     var draftLimit: Int
@@ -32,11 +35,14 @@ final class BatteryModel {
 
     @ObservationIgnored private let client = HelperClient()
     @ObservationIgnored private var pollTask: Task<Void, Never>?
+    @ObservationIgnored private var lastCapacityCheck: Date?
 
     init() {
         let defaults = UserDefaults.standard
         let limit = defaults.object(forKey: Self.limitKey) as? Int ?? 80
-        let initial = ChargeSettings(limit: limit, automaticDischarge: defaults.bool(forKey: Self.autoDischargeKey))
+        let initial = ChargeSettings(limit: limit,
+                                     automaticDischarge: defaults.bool(forKey: Self.autoDischargeKey),
+                                     sailingMode: defaults.bool(forKey: Self.sailingModeKey))
         settings = initial
         draftLimit = initial.limit
         client.onDisconnect = { [weak self] in
@@ -109,6 +115,11 @@ final class BatteryModel {
         persistAndPush()
     }
 
+    func setSailingMode(_ on: Bool) {
+        settings.sailingMode = on
+        persistAndPush()
+    }
+
     func toggleDischarge() {
         let active = !(status?.session.dischargeRequested ?? false)
         send { try await $0.setDischarge(active) }
@@ -139,6 +150,7 @@ final class BatteryModel {
         let defaults = UserDefaults.standard
         defaults.set(settings.limit, forKey: Self.limitKey)
         defaults.set(settings.automaticDischarge, forKey: Self.autoDischargeKey)
+        defaults.set(settings.sailingMode, forKey: Self.sailingModeKey)
         let settings = settings
         send { try await $0.apply(settings) }
     }
@@ -156,6 +168,7 @@ final class BatteryModel {
     }
 
     private func poll() async {
+        await refreshSystemCapacity()
         competingAppRunning = NSWorkspace.shared.runningApplications.contains {
             Self.competingAppBundleIDs.contains($0.bundleIdentifier ?? "")
         }
@@ -177,6 +190,15 @@ final class BatteryModel {
         } catch {
             helperState = .error(error.localizedDescription)
         }
+    }
+
+    /// Maximum Capacity changes slowly; refresh it every 10 minutes.
+    private func refreshSystemCapacity() async {
+        if let last = lastCapacityCheck, Date().timeIntervalSince(last) < 600 { return }
+        lastCapacityCheck = Date()
+        systemMaximumCapacity = await Task.detached(priority: .utility) {
+            SystemBatteryInfo.maximumCapacity()
+        }.value
     }
 
     private func handleDisconnect() {

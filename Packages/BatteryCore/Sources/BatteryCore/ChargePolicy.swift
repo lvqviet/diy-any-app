@@ -3,15 +3,34 @@ import Foundation
 /// User-facing settings, owned by the app and pushed to the helper.
 public struct ChargeSettings: Codable, Equatable, Sendable {
     public static let limitRange = 20...100
+    /// How far below the limit the battery may drift before Sailing Mode charges again.
+    public static let sailingGap = 5
 
     /// Charge limit in percent. 100 means no limit.
     public var limit: Int
     /// Discharge automatically whenever the battery is above the limit while plugged in.
     public var automaticDischarge: Bool
+    /// Sailing Mode: below the limit, only start charging once the battery drops more than
+    /// `sailingGap` below it. Avoids many tiny charge cycles while plugged in.
+    public var sailingMode: Bool
 
-    public init(limit: Int = 80, automaticDischarge: Bool = false) {
+    public init(limit: Int = 80, automaticDischarge: Bool = false, sailingMode: Bool = false) {
         self.limit = min(max(limit, Self.limitRange.lowerBound), Self.limitRange.upperBound)
         self.automaticDischarge = automaticDischarge
+        self.sailingMode = sailingMode
+    }
+
+    /// Percent below which Sailing Mode starts charging again.
+    public var sailingThreshold: Int { limit - Self.sailingGap }
+
+    private enum CodingKeys: String, CodingKey { case limit, automaticDischarge, sailingMode }
+
+    // Tolerates payloads from an older app or helper that lack newer fields.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(limit: try c.decode(Int.self, forKey: .limit),
+                  automaticDischarge: try c.decodeIfPresent(Bool.self, forKey: .automaticDischarge) ?? false,
+                  sailingMode: try c.decodeIfPresent(Bool.self, forKey: .sailingMode) ?? false)
     }
 }
 
@@ -21,10 +40,23 @@ public struct SessionState: Codable, Equatable, Sendable {
     public var dischargeRequested = false
     /// Top Up is active; cleared when the adapter is unplugged.
     public var topUpActive = false
+    /// A charge toward the limit is in progress. Sailing Mode lets it finish instead of
+    /// stopping inside the gap. Cleared at the limit and on unplug.
+    public var chargingToLimit = false
 
-    public init(dischargeRequested: Bool = false, topUpActive: Bool = false) {
+    public init(dischargeRequested: Bool = false, topUpActive: Bool = false, chargingToLimit: Bool = false) {
         self.dischargeRequested = dischargeRequested
         self.topUpActive = topUpActive
+        self.chargingToLimit = chargingToLimit
+    }
+
+    private enum CodingKeys: String, CodingKey { case dischargeRequested, topUpActive, chargingToLimit }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(dischargeRequested: try c.decodeIfPresent(Bool.self, forKey: .dischargeRequested) ?? false,
+                  topUpActive: try c.decodeIfPresent(Bool.self, forKey: .topUpActive) ?? false,
+                  chargingToLimit: try c.decodeIfPresent(Bool.self, forKey: .chargingToLimit) ?? false)
     }
 }
 
@@ -38,6 +70,8 @@ public enum ChargeMode: String, Codable, Sendable {
     case charging
     /// At or above the limit, charging paused, running on adapter power.
     case holding
+    /// Sailing Mode: below the limit but within the gap, charging paused.
+    case sailing
     /// Adapter power cut so the battery drains toward the limit.
     case discharging
     /// Top Up: charging to 100% once.
@@ -73,7 +107,10 @@ public enum ChargePolicy {
         let percent = reading.percent
 
         // Top Up ends as soon as the adapter is unplugged; the regular limit applies again.
-        if !pluggedIn { session.topUpActive = false }
+        if !pluggedIn {
+            session.topUpActive = false
+            session.chargingToLimit = false
+        }
 
         let limit = session.topUpActive ? 100 : settings.limit
 
@@ -86,6 +123,7 @@ public enum ChargePolicy {
             && (session.dischargeRequested || settings.automaticDischarge)
 
         if wantsDischarge {
+            session.chargingToLimit = false
             // Charging is also paused so that restoring the adapter at the target does not charge.
             return ChargeDecision(chargingEnabled: !capabilities.chargingControl, adapterEnabled: false,
                                   preventIdleSleep: true, mode: .discharging, session: session)
@@ -103,9 +141,15 @@ public enum ChargePolicy {
                                   preventIdleSleep: false, mode: .unsupported, session: session)
         }
         if percent >= limit {
+            session.chargingToLimit = false
             return ChargeDecision(chargingEnabled: false, adapterEnabled: true,
                                   preventIdleSleep: false, mode: .holding, session: session)
         }
+        if settings.sailingMode && !session.chargingToLimit && percent >= settings.sailingThreshold {
+            return ChargeDecision(chargingEnabled: false, adapterEnabled: true,
+                                  preventIdleSleep: false, mode: .sailing, session: session)
+        }
+        session.chargingToLimit = true
         return ChargeDecision(chargingEnabled: true, adapterEnabled: true,
                               preventIdleSleep: true, mode: .charging, session: session)
     }

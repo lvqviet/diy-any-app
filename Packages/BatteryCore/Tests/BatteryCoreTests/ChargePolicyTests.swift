@@ -9,10 +9,11 @@ final class ChargePolicyTests: XCTestCase {
                        isCharging: false, amperage: 0, cycleCount: 0, health: 100)
     }
 
-    private func decide(limit: Int = 80, auto: Bool = false, session: SessionState = .init(),
+    private func decide(limit: Int = 80, auto: Bool = false, sailing: Bool = false, session: SessionState = .init(),
                         percent: Int, plugged: Bool = true, adapterOn: Bool = true,
                         caps: ChargeCapabilities? = nil) -> ChargeDecision {
-        ChargePolicy.decide(settings: ChargeSettings(limit: limit, automaticDischarge: auto), session: session,
+        ChargePolicy.decide(settings: ChargeSettings(limit: limit, automaticDischarge: auto, sailingMode: sailing),
+                            session: session,
                             reading: reading(percent, plugged: plugged), adapterEnabledNow: adapterOn,
                             capabilities: caps ?? full)
     }
@@ -167,6 +168,68 @@ final class ChargePolicyTests: XCTestCase {
         // Plugging back in applies the regular limit again.
         let next = decide(session: d.session, percent: 100)
         XCTAssertEqual(next.mode, .holding)
+    }
+
+    // MARK: Sailing Mode
+
+    func testSailingPausesInsideGap() {
+        let d = decide(sailing: true, percent: 76)
+        XCTAssertEqual(d.mode, .sailing)
+        XCTAssertFalse(d.chargingEnabled)
+        XCTAssertTrue(d.adapterEnabled)
+        XCTAssertFalse(d.preventIdleSleep)
+    }
+
+    func testSailingChargesAtThresholdBoundary() {
+        XCTAssertEqual(decide(sailing: true, percent: 75).mode, .sailing)
+        let d = decide(sailing: true, percent: 74)
+        XCTAssertEqual(d.mode, .charging)
+        XCTAssertTrue(d.chargingEnabled)
+        XCTAssertTrue(d.session.chargingToLimit)
+    }
+
+    func testSailingFinishesChargeToLimit() {
+        var session = decide(sailing: true, percent: 74).session
+        for percent in 75...79 {
+            let d = decide(sailing: true, session: session, percent: percent)
+            XCTAssertEqual(d.mode, .charging, "at \(percent)%")
+            session = d.session
+        }
+        let atLimit = decide(sailing: true, session: session, percent: 80)
+        XCTAssertEqual(atLimit.mode, .holding)
+        XCTAssertFalse(atLimit.session.chargingToLimit)
+        // Drifting back down stays inside the gap without charging.
+        XCTAssertEqual(decide(sailing: true, session: atLimit.session, percent: 78).mode, .sailing)
+    }
+
+    func testWithoutSailingChargesRightBelowLimit() {
+        XCTAssertEqual(decide(percent: 79).mode, .charging)
+    }
+
+    func testEnablingSailingMidChargeKeepsCharging() {
+        let charging = decide(percent: 77)
+        XCTAssertTrue(charging.session.chargingToLimit)
+        XCTAssertEqual(decide(sailing: true, session: charging.session, percent: 78).mode, .charging)
+    }
+
+    func testUnplugClearsChargeInProgress() {
+        let d = decide(sailing: true, session: .init(chargingToLimit: true), percent: 77, plugged: false)
+        XCTAssertFalse(d.session.chargingToLimit)
+        XCTAssertEqual(decide(sailing: true, session: d.session, percent: 77).mode, .sailing)
+    }
+
+    func testTopUpIgnoresSailing() {
+        let d = decide(sailing: true, session: .init(topUpActive: true), percent: 90)
+        XCTAssertEqual(d.mode, .toppingUp)
+        XCTAssertTrue(d.chargingEnabled)
+    }
+
+    func testSettingsDecodeWithoutSailingField() throws {
+        let old = Data(#"{"limit":70,"automaticDischarge":true}"#.utf8)
+        let s = try JSON.decode(ChargeSettings.self, old)
+        XCTAssertEqual(s, ChargeSettings(limit: 70, automaticDischarge: true, sailingMode: false))
+        XCTAssertEqual(try JSON.decode(SessionState.self, Data(#"{"topUpActive":true}"#.utf8)),
+                       SessionState(topUpActive: true))
     }
 
     // MARK: Sleep and capabilities

@@ -10,7 +10,7 @@ nonisolated(unsafe) private var selfTestHardware: SMCChargeHardware?
 ///     sudo DIYAnyAppHelper charging on|off
 ///     sudo DIYAnyAppHelper adapter on|off
 ///     sudo DIYAnyAppHelper selftest
-///     sudo DIYAnyAppHelper run [--limit 80] [--auto-discharge] [--discharge] [--top-up] [--seconds N]
+///     sudo DIYAnyAppHelper run [--limit 80] [--auto-discharge] [--sailing] [--discharge] [--top-up] [--seconds N]
 enum DebugCLI {
     static func main(_ args: [String]) -> Int32 {
         setvbuf(stdout, nil, _IOLBF, 0)
@@ -32,7 +32,7 @@ enum DebugCLI {
                        sudo DIYAnyAppHelper charging on|off
                        sudo DIYAnyAppHelper adapter on|off
                        sudo DIYAnyAppHelper selftest
-                       sudo DIYAnyAppHelper run [--limit N] [--auto-discharge] [--discharge] [--top-up] [--seconds N]
+                       sudo DIYAnyAppHelper run [--limit N] [--auto-discharge] [--sailing] [--discharge] [--top-up] [--seconds N]
                 """)
                 return 64
             }
@@ -51,6 +51,14 @@ enum DebugCLI {
         print("capabilities: charging=\(hw.capabilities.chargingControl) adapter=\(hw.capabilities.adapterControl)")
         print("chargingEnabled=\(try hw.isChargingEnabled()) adapterEnabled=\(try hw.isAdapterEnabled())")
         print(snapshot(smc))
+        if let r = try? BatteryReader.read(smc: smc) {
+            let p = r.power
+            print("adapter=\(p?.adapterName ?? "-") \(p?.adapterWatts.map { "\($0)W" } ?? "-") "
+                + "in=\(p?.inputPower.map { String(format: "%.1fW", $0) } ?? "-") "
+                + "battery=\(r.batteryPower.map { String(format: "%+.1fW", $0) } ?? "-") "
+                + "voltage=\(p?.batteryVoltage.map { "\($0)mV" } ?? "-") "
+                + "capacity=\(r.maxCapacity ?? 0)/\(r.designCapacity ?? 0)mAh")
+        }
     }
 
     private static func setSwitch(_ args: [String], _ body: (SMCChargeHardware, Bool) throws -> Void) throws {
@@ -162,13 +170,14 @@ enum DebugCLI {
     /// Runs the real controller in the foreground, printing a status line every 5 seconds.
     private static func runLoop(_ args: [String]) throws -> Never {
         try requireRoot()
-        var limit = 80, auto = false, discharge = false, topUp = false
+        var limit = 80, auto = false, sailing = false, discharge = false, topUp = false
         var seconds: Int?
         var it = args.makeIterator()
         while let arg = it.next() {
             switch arg {
             case "--limit": limit = Int(it.next() ?? "") ?? limit
             case "--auto-discharge": auto = true
+            case "--sailing": sailing = true
             case "--discharge": discharge = true
             case "--top-up": topUp = true
             case "--seconds": seconds = Int(it.next() ?? "")
@@ -183,10 +192,10 @@ enum DebugCLI {
         watcher.onPowerSourceChange = { controller.tick() }
         controller.start()
         watcher.start()
-        controller.apply(ChargeSettings(limit: limit, automaticDischarge: auto))
+        controller.apply(ChargeSettings(limit: limit, automaticDischarge: auto, sailingMode: sailing))
         if discharge, let error = controller.setDischarge(true) { print("discharge: \(error)") }
         if topUp, let error = controller.setTopUp(true) { print("top up: \(error)") }
-        print("running with limit=\(limit) autoDischarge=\(auto) discharge=\(discharge) topUp=\(topUp)")
+        print("running with limit=\(limit) autoDischarge=\(auto) sailing=\(sailing) discharge=\(discharge) topUp=\(topUp)")
 
         let printer = DispatchSource.makeTimerSource(queue: .main)
         printer.schedule(deadline: .now(), repeating: .seconds(5))

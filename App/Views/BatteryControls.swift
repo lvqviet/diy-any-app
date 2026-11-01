@@ -1,7 +1,7 @@
 import BatteryCore
 import SwiftUI
 
-/// Charge Limiter, Discharge, Automatic Discharge and Top Up controls.
+/// Charge Limiter, Discharge, Automatic Discharge, Sailing Mode and Top Up controls.
 /// Shared by the menu bar panel and the main window.
 struct BatteryControls: View {
     @Environment(BatteryModel.self) private var model
@@ -15,7 +15,10 @@ struct BatteryControls: View {
                        text: "AlDente is running. Quit it so the two apps do not fight over charging.")
             }
             if let status = model.status {
-                StatusHeader(status: status)
+                StatusHeader(status: status, ringSize: compact ? 64 : 84)
+                if let reading = status.reading {
+                    PowerSummary(reading: reading)
+                }
                 LimitSlider()
                 ActionButtons(status: status)
                 if !status.capabilities.chargingControl || !status.capabilities.adapterControl {
@@ -33,7 +36,7 @@ struct BatteryControls: View {
 
     private func unsupportedText(_ caps: ChargeCapabilities) -> String {
         var missing: [String] = []
-        if !caps.chargingControl { missing.append("Charge Limiter and Top Up") }
+        if !caps.chargingControl { missing.append("Charge Limiter, Sailing Mode and Top Up") }
         if !caps.adapterControl { missing.append("Discharge") }
         return "Not supported by this Mac's firmware: \(missing.joined(separator: ", "))."
     }
@@ -41,20 +44,24 @@ struct BatteryControls: View {
 
 private struct StatusHeader: View {
     let status: HelperStatus
+    let ringSize: CGFloat
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 14) {
             if let r = status.reading {
-                Text("\(r.percent)%")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
+                BatteryRing(percent: r.percent, settings: status.settings, mode: status.mode,
+                            color: BatteryStyle.color(status))
+                    .frame(width: ringSize, height: ringSize)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Circle().fill(BatteryStyle.color(status.mode)).frame(width: 8, height: 8)
+                    Image(systemName: BatteryStyle.icon(status))
+                        .foregroundStyle(BatteryStyle.color(status))
+                        .symbolEffect(.pulse, options: .repeating, isActive: BatteryStyle.isActive(status.mode))
+                        .frame(width: 18)
                     Text(BatteryStyle.title(status.mode)).font(.headline)
                 }
-                Text(BatteryStyle.detail(status.mode))
+                Text(BatteryStyle.detail(status))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -63,28 +70,75 @@ private struct StatusHeader: View {
     }
 }
 
+/// One-line power summary: negotiated adapter power, power drawn, battery power.
+private struct PowerSummary: View {
+    let reading: BatteryReading
+
+    var body: some View {
+        let power = reading.power
+        HStack(spacing: 12) {
+            if let watts = power?.adapterWatts {
+                item("powerplug.fill", .green, "\(watts) W", help: power?.adapterName ?? "Adapter")
+            }
+            if let input = power?.inputPower, power?.adapterWatts != nil {
+                item("arrow.down.to.line", .orange, "In \(PowerFormat.watts(input))", help: "Power drawn from the adapter")
+            }
+            if let battery = reading.batteryPower {
+                item(battery >= 0 ? "battery.100percent.bolt" : "battery.50percent",
+                     battery > 0.05 ? .yellow : (battery < -0.05 ? .blue : .secondary),
+                     PowerFormat.watts(battery, signed: true),
+                     help: "Battery power: positive while charging, negative while draining")
+            }
+        }
+        .font(.caption)
+        .monospacedDigit()
+    }
+
+    private func item(_ symbol: String, _ tint: Color, _ text: String, help: String) -> some View {
+        Label {
+            Text(text).foregroundStyle(.secondary)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(tint)
+        }
+        .labelStyle(.titleAndIcon)
+        .help(help)
+    }
+}
+
 private struct LimitSlider: View {
     @Environment(BatteryModel.self) private var model
 
+    private var range: ClosedRange<Int> { ChargeSettings.limitRange }
+
     var body: some View {
-        @Bindable var model = model
+        let enabled = model.status?.capabilities.chargingControl == true
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Charge Limit").font(.subheadline.weight(.medium))
+            HStack(spacing: 6) {
+                Label {
+                    Text("Charge Limit").font(.subheadline.weight(.medium))
+                } icon: {
+                    Image(systemName: "gauge.with.dots.needle.67percent").foregroundStyle(.green)
+                }
                 Spacer()
                 Text(model.draftLimit >= 100 ? "Off (100%)" : "\(model.draftLimit)%")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                Stepper("Charge Limit", value: Binding(
+                    get: { model.draftLimit },
+                    set: { model.draftLimit = $0; model.commitLimit() }
+                ), in: range)
+                .labelsHidden()
+                .controlSize(.small)
             }
+            // No step: the thumb moves freely and snaps to whole percents.
             Slider(
-                value: Binding(get: { Double(model.draftLimit) }, set: { model.draftLimit = Int($0) }),
-                in: Double(ChargeSettings.limitRange.lowerBound)...Double(ChargeSettings.limitRange.upperBound),
-                step: 5
+                value: Binding(get: { Double(model.draftLimit) }, set: { model.draftLimit = Int($0.rounded()) }),
+                in: Double(range.lowerBound)...Double(range.upperBound)
             ) { editing in
                 if !editing { model.commitLimit() }
             }
-            .disabled(model.status?.capabilities.chargingControl != true)
         }
+        .disabled(!enabled)
     }
 }
 
@@ -97,26 +151,61 @@ private struct ActionButtons: View {
             HStack(spacing: 8) {
                 if !model.settings.automaticDischarge {
                     let active = status.session.dischargeRequested
-                    Button(active ? "Stop Discharge" : "Discharge") { model.toggleDischarge() }
-                        .disabled(!active && !model.canStartDischarge)
-                        .help("Drain the battery to the limit while plugged in")
+                    Button { model.toggleDischarge() } label: {
+                        Label {
+                            Text(active ? "Stop Discharge" : "Discharge")
+                        } icon: {
+                            Image(systemName: active ? "stop.circle.fill" : "arrow.down.circle.fill")
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .disabled(!active && !model.canStartDischarge)
+                    .help("Drain the battery to the limit while plugged in")
                 }
                 let topUp = status.session.topUpActive
-                Button(topUp ? "Cancel Top Up" : "Top Up") { model.toggleTopUp() }
-                    .disabled(!topUp && !model.canTopUp)
-                    .help("Charge to 100% once; the limit returns after you unplug")
+                Button { model.toggleTopUp() } label: {
+                    Label {
+                        Text(topUp ? "Cancel Top Up" : "Top Up")
+                    } icon: {
+                        Image(systemName: topUp ? "xmark.circle.fill" : "bolt.circle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .disabled(!topUp && !model.canTopUp)
+                .help("Charge to 100% once; the limit returns after you unplug")
             }
             .controlSize(.regular)
 
-            Toggle("Automatic Discharge", isOn: Binding(
-                get: { model.settings.automaticDischarge },
-                set: { model.setAutomaticDischarge($0) }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .disabled(!status.capabilities.adapterControl)
-            .help("Discharge automatically whenever the battery is above the limit while plugged in")
+            SettingToggle(title: "Automatic Discharge", symbol: "arrow.down.circle", tint: .blue,
+                          isOn: model.settings.automaticDischarge, set: model.setAutomaticDischarge)
+                .disabled(!status.capabilities.adapterControl)
+                .help("Discharge automatically whenever the battery is above the limit while plugged in")
+
+            SettingToggle(title: "Sailing Mode", symbol: "sailboat", tint: .teal,
+                          isOn: model.settings.sailingMode, set: model.setSailingMode)
+                .disabled(!status.capabilities.chargingControl || model.settings.limit >= 100)
+                .help("Below the limit, only charge again once the battery drops \(ChargeSettings.sailingGap)% under it")
         }
+    }
+}
+
+private struct SettingToggle: View {
+    let title: String
+    let symbol: String
+    let tint: Color
+    let isOn: Bool
+    let set: (Bool) -> Void
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { isOn }, set: set)) {
+            Label {
+                Text(title)
+            } icon: {
+                Image(systemName: symbol).foregroundStyle(tint)
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
     }
 }
 
