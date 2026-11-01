@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.diyanyapp.me.helper</string>
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/DIYAnyAppHelper</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.diyanyapp.me</string>
+	</array>
+	<key>MachServices</key>
+	<dict>
+		<key>com.diyanyapp.me.helper</key>
+		<true/>
+	</dict>
+	<!-- Started at boot and kept alive so that it can restore normal charging after a crash or reboot. -->
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,62 @@
+name: DIYAnyApp
+
+options:
+  bundleIdPrefix: com.diyanyapp
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: U8GCXBC6Q3
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+
+packages:
+  BatteryCore:
+    path: Packages/BatteryCore
+
+targets:
+  DIYAnyApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: Helper/Launchd/com.diyanyapp.me.helper.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchDaemons
+    dependencies:
+      - package: BatteryCore
+      - target: DIYAnyAppHelper
+        copy:
+          destination: executables
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.diyanyapp.me
+        PRODUCT_NAME: DIY Any App
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_CFBundleDisplayName: DIY Any App
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        ENABLE_APP_SANDBOX: NO
+
+  DIYAnyAppHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Helper/Sources
+    dependencies:
+      - package: BatteryCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.diyanyapp.me.helper
+        PRODUCT_NAME: DIYAnyAppHelper
+        INFOPLIST_FILE: Helper/Info.plist
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        SKIP_INSTALL: YES
