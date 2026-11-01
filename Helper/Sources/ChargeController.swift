@@ -22,6 +22,9 @@ final class ChargeController {
     private var enforcing = false
     private var sleeping = false
     private var lastError: String?
+    /// Falls back to normal charging when the loop keeps failing, so a stale hardware state
+    /// (e.g. adapter cut during a discharge) cannot persist.
+    private var failSafe = FailSafe(threshold: 3)
     private var idleSleepAssertion: IOPMAssertionID?
     private var timer: DispatchSourceTimer?
     private let executableMTime = ChargeController.currentExecutableMTime()
@@ -87,6 +90,7 @@ final class ChargeController {
         log.info("app disconnected, restoring normal charging")
         enforcing = false
         session = SessionState()
+        failSafe = FailSafe(threshold: failSafe.threshold)
         restoreDefaults()
     }
 
@@ -138,31 +142,51 @@ final class ChargeController {
             let adapterNow = try hw.isAdapterEnabled()
             let decision = ChargePolicy.decide(settings: settings, session: session, reading: reading,
                                                adapterEnabledNow: adapterNow, capabilities: capabilities)
+            try write(charging: decision.chargingEnabled, adapter: decision.adapterEnabled, on: hw)
             session = decision.session
             if decision.mode != mode {
                 log.info("mode \(self.mode.rawValue, privacy: .public) -> \(decision.mode.rawValue, privacy: .public) at \(reading.percent)%")
             }
             mode = decision.mode
-            apply(charging: decision.chargingEnabled, adapter: decision.adapterEnabled, on: hw)
             setIdleSleepPrevented(decision.preventIdleSleep)
+            if failSafe.recordSuccess() { log.info("charge control recovered") }
+            lastError = nil
         } catch {
+            handleTickFailure(error)
+        }
+    }
+
+    /// Repeated failures restore normal charging; the loop keeps retrying and takes control
+    /// again on the next successful tick.
+    private func handleTickFailure(_ error: Error) {
+        if failSafe.recordFailure() {
+            log.error("\(self.failSafe.threshold) failures in a row, restoring normal charging")
+            restoreDefaults()
+        }
+        if failSafe.isTripped {
+            fail("Charge control paused after repeated errors; normal charging restored. Last error: \(error)")
+        } else {
             fail("tick failed: \(error)")
+        }
+    }
+
+    /// Best-effort write for sleep and restore paths, where there is nothing better to fall back to.
+    private func apply(charging: Bool, adapter: Bool, on hw: ChargeHardware) {
+        do {
+            try write(charging: charging, adapter: adapter, on: hw)
+        } catch {
+            fail("hardware write failed: \(error)")
         }
     }
 
     /// Writes only when the hardware differs from the desired state. Charging is set before the
     /// adapter so that restoring the adapter at the limit never starts a charge.
-    private func apply(charging: Bool, adapter: Bool, on hw: ChargeHardware) {
-        do {
-            if capabilities.chargingControl, try hw.isChargingEnabled() != charging {
-                try hw.setChargingEnabled(charging)
-            }
-            if capabilities.adapterControl, try hw.isAdapterEnabled() != adapter {
-                try hw.setAdapterEnabled(adapter)
-            }
-            lastError = nil
-        } catch {
-            fail("hardware write failed: \(error)")
+    private func write(charging: Bool, adapter: Bool, on hw: ChargeHardware) throws {
+        if capabilities.chargingControl, try hw.isChargingEnabled() != charging {
+            try hw.setChargingEnabled(charging)
+        }
+        if capabilities.adapterControl, try hw.isAdapterEnabled() != adapter {
+            try hw.setAdapterEnabled(adapter)
         }
     }
 

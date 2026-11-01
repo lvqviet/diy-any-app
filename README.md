@@ -16,6 +16,7 @@ Personal macOS menu bar app that combines features of paid apps into one native 
 Behavior:
 
 - Charge control only applies while the app is running. Quitting (or a crash) restores normal charging.
+- If the control loop fails 3 times in a row (about 15 seconds), normal charging is restored so a stale state such as adapter power cut during a discharge cannot persist. Control resumes automatically once reads succeed again.
 - While charging toward the limit or discharging, idle sleep is held off. If the Mac is put to sleep anyway, charging is paused and adapter power restored right before sleep, so the limit is never exceeded and the battery never drains while asleep.
 
 ## Architecture
