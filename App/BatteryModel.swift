@@ -124,12 +124,13 @@ final class BatteryModel {
     var canStartDischarge: Bool {
         guard let s = status, let r = s.reading else { return false }
         return s.capabilities.adapterControl && r.percent > settings.limit
-            && (r.adapterConnected || !s.adapterEnabled) && !settings.automaticDischarge
+            && ChargePolicy.isPluggedIn(r, adapterEnabledNow: s.adapterEnabled) && !settings.automaticDischarge
     }
 
     var canTopUp: Bool {
         guard let s = status, let r = s.reading else { return false }
-        return s.capabilities.chargingControl && settings.limit < 100 && r.adapterConnected
+        return s.capabilities.chargingControl && settings.limit < 100
+            && ChargePolicy.isPluggedIn(r, adapterEnabledNow: s.adapterEnabled)
     }
 
     // MARK: Private

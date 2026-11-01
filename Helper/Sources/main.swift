@@ -1,5 +1,9 @@
 import Foundation
 
+// Any argument switches to the developer CLI (see DebugCLI).
+let arguments = Array(CommandLine.arguments.dropFirst())
+if !arguments.isEmpty { exit(DebugCLI.main(arguments)) }
+
 // Privileged helper: launched by launchd as root, registered by the app via SMAppService.
 let controller = ChargeController()
 let server = XPCServer(controller: controller)

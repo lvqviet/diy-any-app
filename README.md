@@ -48,6 +48,32 @@ Firmware shipped with macOS 27 / 26.7 (and some 15.x security updates) gates the
 scripts/install.sh        # signed Release build, installed to /Applications
 ```
 
+### Updating
+
+Commit the change, then run `scripts/install.sh` again. It quits the running app, replaces it in
+`/Applications` and relaunches it. Settings (UserDefaults) and the helper registration are kept.
+The helper notices its binary changed and restarts itself, so no reinstall or re-approval is needed.
+
+Bump `HelperConstants.protocolVersion` whenever the XPC interface changes; the app then asks to
+reinstall the helper (Battery › Helper › Uninstall, then Install). The same applies if the
+launchd plist changes.
+
+Bump `MARKETING_VERSION` in `project.yml` for notable releases. The build number is the git
+commit count. The signing certificate (free Personal Team) is valid for one year; Xcode renews
+it automatically on the next build.
+
+### Testing on hardware
+
+`scripts/dev-helper.sh` builds the Debug helper and runs its developer commands as root, logging to `build/logs/`:
+
+```sh
+scripts/dev-helper.sh status                        # read-only
+scripts/dev-helper.sh selftest                      # toggles CHTE/CH0J and checks the battery reacts
+scripts/dev-helper.sh run --limit 80 --discharge    # runs the real control loop in the foreground
+scripts/dev-helper.sh charging on                   # recovery
+scripts/dev-helper.sh adapter on                    # recovery
+```
+
 Development:
 
 ```sh

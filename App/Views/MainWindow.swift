@@ -55,6 +55,7 @@ private struct BatteryPage: View {
             }
             Section("General") {
                 LaunchAtLoginToggle()
+                LabeledContent("Version", value: appVersion)
             }
             Section("Helper") {
                 LabeledContent("Status", value: helperText)
@@ -65,6 +66,13 @@ private struct BatteryPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Battery")
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     private var helperText: String {

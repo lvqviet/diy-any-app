@@ -91,6 +91,34 @@ final class ChargePolicyTests: XCTestCase {
         XCTAssertFalse(d.session.dischargeRequested)
     }
 
+    func testDischargeUsesPhysicalChargerStateWhenKnown() {
+        var r = reading(90, plugged: false)
+        r.chargerAttached = true
+        let d = ChargePolicy.decide(settings: .init(limit: 80), session: .init(dischargeRequested: true),
+                                    reading: r, adapterEnabledNow: false, capabilities: full)
+        XCTAssertEqual(d.mode, .discharging)
+    }
+
+    func testUnplugDuringDischargeRestoresAdapter() {
+        var r = reading(90, plugged: false)
+        r.chargerAttached = false
+        let d = ChargePolicy.decide(settings: .init(limit: 80, automaticDischarge: true),
+                                    session: .init(dischargeRequested: true),
+                                    reading: r, adapterEnabledNow: false, capabilities: full)
+        XCTAssertEqual(d.mode, .onBattery)
+        XCTAssertTrue(d.adapterEnabled)
+        XCTAssertTrue(d.chargingEnabled)
+        XCTAssertFalse(d.session.dischargeRequested)
+    }
+
+    func testUnplugDuringTopUpWhenAdapterCutIsDetected() {
+        var r = reading(95, plugged: false)
+        r.chargerAttached = false
+        let d = ChargePolicy.decide(settings: .init(limit: 80), session: .init(topUpActive: true),
+                                    reading: r, adapterEnabledNow: true, capabilities: full)
+        XCTAssertFalse(d.session.topUpActive)
+    }
+
     func testManualDischargeDroppedWhenUnpluggedWithAdapterOn() {
         let d = decide(session: .init(dischargeRequested: true), percent: 90, plugged: false, adapterOn: true)
         XCTAssertEqual(d.mode, .onBattery)

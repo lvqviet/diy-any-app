@@ -61,15 +61,15 @@ public enum ChargePolicy {
     /// Decides the hardware state for a regular control-loop tick.
     ///
     /// - Parameters:
-    ///   - adapterEnabledNow: current adapter switch state. When we have cut the adapter, the
-    ///     charger is still considered plugged in even if macOS no longer reports it.
+    ///   - adapterEnabledNow: current adapter switch state. Used only when the physical
+    ///     charger state is unknown: after we cut the adapter macOS reports it unplugged.
     public static func decide(settings: ChargeSettings,
                               session: SessionState,
                               reading: BatteryReading,
                               adapterEnabledNow: Bool,
                               capabilities: ChargeCapabilities) -> ChargeDecision {
         var session = session
-        let pluggedIn = reading.adapterConnected || !adapterEnabledNow
+        let pluggedIn = isPluggedIn(reading, adapterEnabledNow: adapterEnabledNow)
         let percent = reading.percent
 
         // Top Up ends as soon as the adapter is unplugged; the regular limit applies again.
@@ -108,6 +108,11 @@ public enum ChargePolicy {
         }
         return ChargeDecision(chargingEnabled: true, adapterEnabled: true,
                               preventIdleSleep: true, mode: .charging, session: session)
+    }
+
+    /// Whether a charger is physically attached, regardless of our adapter switch.
+    public static func isPluggedIn(_ reading: BatteryReading, adapterEnabledNow: Bool) -> Bool {
+        reading.chargerAttached ?? (reading.adapterConnected || !adapterEnabledNow)
     }
 
     /// Hardware state to apply right before the system sleeps. Nothing runs while asleep, so

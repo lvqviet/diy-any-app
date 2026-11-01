@@ -13,6 +13,7 @@ private let log = Logger(subsystem: HelperConstants.machServiceName, category: "
 final class ChargeController {
     private static let tickInterval: DispatchTimeInterval = .seconds(5)
 
+    private let smc: SMC?
     private let hardware: ChargeHardware?
     private let capabilities: ChargeCapabilities
     private var settings = ChargeSettings()
@@ -27,11 +28,14 @@ final class ChargeController {
 
     init() {
         do {
-            let hw = try SMCChargeHardware(smc: SMC())
+            let smc = try SMC()
+            let hw = try SMCChargeHardware(smc: smc)
+            self.smc = smc
             hardware = hw
             capabilities = hw.capabilities
         } catch {
             log.error("SMC unavailable: \(String(describing: error), privacy: .public)")
+            smc = nil
             hardware = nil
             capabilities = ChargeCapabilities(chargingControl: false, adapterControl: false)
             lastError = "SMC unavailable: \(error)"
@@ -87,7 +91,7 @@ final class ChargeController {
     }
 
     func status() -> HelperStatus {
-        let reading = try? BatteryReader.read()
+        let reading = try? BatteryReader.read(smc: smc)
         return HelperStatus(
             protocolVersion: HelperConstants.protocolVersion,
             capabilities: capabilities,
@@ -130,7 +134,7 @@ final class ChargeController {
         }
         guard enforcing, !sleeping, let hw = hardware else { return }
         do {
-            let reading = try BatteryReader.read()
+            let reading = try BatteryReader.read(smc: smc)
             let adapterNow = try hw.isAdapterEnabled()
             let decision = ChargePolicy.decide(settings: settings, session: session, reading: reading,
                                                adapterEnabledNow: adapterNow, capabilities: capabilities)
