@@ -48,6 +48,9 @@ struct BatteryControls: View {
 private struct StatusHeader: View {
     let status: HelperStatus
     let ringSize: CGFloat
+    /// The repeating pulse renders every display frame. Closed panels and windows stay alive,
+    /// so it only runs while its window is visible.
+    @State private var visible = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -60,6 +63,8 @@ private struct StatusHeader: View {
                 HStack(spacing: 6) {
                     Image(systemName: BatteryStyle.icon(status))
                         .foregroundStyle(BatteryStyle.color(status))
+                        .symbolEffect(.pulse, options: .repeating,
+                                      isActive: visible && BatteryStyle.isActive(status.mode))
                         .frame(width: 18)
                     Text(BatteryStyle.title(status.mode)).font(.headline)
                 }
@@ -69,6 +74,7 @@ private struct StatusHeader: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .onWindowVisibilityChange { visible = $0 }
     }
 }
 

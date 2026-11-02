@@ -44,10 +44,18 @@ final class BatteryModel {
     @ObservationIgnored private var workspaceObservers: [NSObjectProtocol] = []
     /// Windows (panel, main window) currently on screen. Polling is fast only while one is.
     @ObservationIgnored private var visibleWindows: Set<String> = []
+    @ObservationIgnored private var powerMonitor: PowerSourceMonitor?
+    @ObservationIgnored private var powerChangeTask: Task<Void, Never>?
+    @ObservationIgnored private var polling = false
+    @ObservationIgnored private var pollAgain = false
 
-    /// Status refresh while a window shows details, and while only the menu bar label shows.
+    /// Status refresh while a window shows live power details. With every window closed only
+    /// the menu bar label shows; power source notifications keep it current and the slow
+    /// poll is a fallback for changes made by the helper alone (e.g. reaching the limit).
     private static let visiblePollInterval: Duration = .seconds(3)
-    private static let hiddenPollInterval: Duration = .seconds(20)
+    private static let hiddenPollInterval: Duration = .seconds(15)
+    /// macOS sends several notifications for one plug or unplug; refresh once after them.
+    private static let powerChangeDelay: Duration = .milliseconds(300)
 
     init() {
         let defaults = UserDefaults.standard
@@ -61,6 +69,7 @@ final class BatteryModel {
             Task { @MainActor in self?.handleDisconnect() }
         }
         observeCompetingApps()
+        powerMonitor = PowerSourceMonitor { [weak self] in self?.powerSourceChanged() }
         start()
     }
 
@@ -84,10 +93,33 @@ final class BatteryModel {
         let interval = visibleWindows.isEmpty ? Self.hiddenPollInterval : Self.visiblePollInterval
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.poll()
+                await self?.refresh()
                 do { try await Task.sleep(for: interval) } catch { return }
             }
         }
+    }
+
+    private func powerSourceChanged() {
+        powerChangeTask?.cancel()
+        powerChangeTask = Task { [weak self] in
+            do { try await Task.sleep(for: Self.powerChangeDelay) } catch { return }
+            await self?.refresh()
+        }
+    }
+
+    /// Refreshes the helper status. A request made while one is in flight runs once more
+    /// right after it, so no change is missed and calls never overlap.
+    private func refresh() async {
+        if polling {
+            pollAgain = true
+            return
+        }
+        polling = true
+        repeat {
+            pollAgain = false
+            await poll()
+        } while pollAgain
+        polling = false
     }
 
     func refreshRegistration() {
@@ -189,7 +221,7 @@ final class BatteryModel {
             } catch {
                 lastError = error.localizedDescription
             }
-            await poll()
+            await refresh()
         }
     }
 
