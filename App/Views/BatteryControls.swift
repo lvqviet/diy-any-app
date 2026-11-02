@@ -2,7 +2,8 @@ import BatteryCore
 import SwiftUI
 
 /// Charge Limiter, Discharge, Automatic Discharge, Sailing Mode and Top Up controls.
-/// Shared by the menu bar panel and the main window.
+/// Shared by the menu bar panel and the main window; the compact panel leaves out the
+/// Automatic Discharge and Sailing Mode settings, which live in the main window.
 struct BatteryControls: View {
     @Environment(BatteryModel.self) private var model
     var compact = false
@@ -20,7 +21,7 @@ struct BatteryControls: View {
                     PowerSummary(reading: reading)
                 }
                 LimitSlider()
-                ActionButtons(status: status)
+                ActionButtons(status: status, showsSettings: !compact)
                 if !status.capabilities.chargingControl || !status.capabilities.adapterControl {
                     Notice(icon: "xmark.octagon.fill", tint: .red, text: unsupportedText(status.capabilities))
                 }
@@ -136,6 +137,7 @@ private struct LimitSlider: View {
 private struct ActionButtons: View {
     @Environment(BatteryModel.self) private var model
     let status: HelperStatus
+    let showsSettings: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -153,14 +155,16 @@ private struct ActionButtons: View {
             }
             .controlSize(.regular)
 
-            settingToggle("Automatic Discharge", isOn: model.settings.automaticDischarge,
-                          set: model.setAutomaticDischarge)
-                .disabled(!status.capabilities.adapterControl)
-                .help("Discharge automatically whenever the battery is above the limit while plugged in")
+            if showsSettings {
+                settingToggle("Automatic Discharge", isOn: model.settings.automaticDischarge,
+                              set: model.setAutomaticDischarge)
+                    .disabled(!status.capabilities.adapterControl)
+                    .help("Discharge automatically whenever the battery is above the limit while plugged in")
 
-            settingToggle("Sailing Mode", isOn: model.settings.sailingMode, set: model.setSailingMode)
-                .disabled(!status.capabilities.chargingControl || model.settings.limit >= 100)
-                .help("Below the limit, only charge again once the battery drops \(ChargeSettings.sailingGap)% under it")
+                settingToggle("Sailing Mode", isOn: model.settings.sailingMode, set: model.setSailingMode)
+                    .disabled(!status.capabilities.chargingControl || model.settings.limit >= 100)
+                    .help("Below the limit, only charge again once the battery drops \(ChargeSettings.sailingGap)% under it")
+            }
         }
     }
 

@@ -29,10 +29,14 @@ struct MainWindow: View {
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
-            switch selection {
-            case .battery, .none:
-                BatteryPage()
+            Group {
+                switch selection {
+                case .battery, .none:
+                    BatteryPage()
+                }
             }
+            // Opaque detail pane, so the translucent sidebar reads as lighter than the content.
+            .background(Color(nsColor: .windowBackgroundColor))
         }
     }
 }
