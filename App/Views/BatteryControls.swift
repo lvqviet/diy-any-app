@@ -1,9 +1,9 @@
 import BatteryCore
 import SwiftUI
 
-/// Charge Limiter, Discharge, Automatic Discharge, Sailing Mode and Top Up controls.
-/// Shared by the menu bar panel and the main window; the compact panel leaves out the
-/// Automatic Discharge and Sailing Mode settings, which live in the main window.
+/// Battery status with the Discharge and Top Up actions, shared by the menu bar panel and the
+/// main window. The compact panel also shows the charge limit slider; the main window shows the
+/// limit and the other settings as form rows instead (`BatterySettingsRows`).
 struct BatteryControls: View {
     @Environment(BatteryModel.self) private var model
     var compact = false
@@ -20,8 +20,10 @@ struct BatteryControls: View {
                 if let reading = status.reading {
                     PowerSummary(reading: reading)
                 }
-                LimitSlider()
-                ActionButtons(status: status, showsSettings: !compact)
+                if compact {
+                    LimitSlider()
+                }
+                ActionButtons(status: status)
                 if !status.capabilities.chargingControl || !status.capabilities.adapterControl {
                     Notice(icon: "xmark.octagon.fill", tint: .red, text: unsupportedText(status.capabilities))
                 }
@@ -137,47 +139,27 @@ private struct LimitSlider: View {
 private struct ActionButtons: View {
     @Environment(BatteryModel.self) private var model
     let status: HelperStatus
-    let showsSettings: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                if !model.settings.automaticDischarge {
-                    let active = status.session.dischargeRequested
-                    Button { model.toggleDischarge() } label: {
-                        Text(active ? "Stop Discharge" : "Discharge").frame(maxWidth: .infinity)
-                    }
-                    .disabled(!active && !model.canStartDischarge)
-                    .help("Drain the battery to the limit while plugged in")
+        HStack(spacing: 12) {
+            if !model.settings.automaticDischarge {
+                let active = status.session.dischargeRequested
+                Button { model.toggleDischarge() } label: {
+                    Text(active ? "Stop Discharge" : "Discharge").frame(maxWidth: .infinity)
                 }
-                let topUp = status.session.topUpActive
-                Button { model.toggleTopUp() } label: {
-                    Text(topUp ? "Cancel Top Up" : "Top Up").frame(maxWidth: .infinity)
-                }
-                .disabled(!topUp && !model.canTopUp)
-                .help("Charge to 100% once; the limit returns after you unplug")
+                .disabled(!active && !model.canStartDischarge)
+                .help("Drain the battery to the limit while plugged in")
             }
-            // Explicit, so the borderless style of the panel's menu rows does not apply here.
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-
-            if showsSettings {
-                settingToggle("Automatic Discharge", isOn: model.settings.automaticDischarge,
-                              set: model.setAutomaticDischarge)
-                    .disabled(!status.capabilities.adapterControl)
-                    .help("Discharge automatically whenever the battery is above the limit while plugged in")
-
-                settingToggle("Sailing Mode", isOn: model.settings.sailingMode, set: model.setSailingMode)
-                    .disabled(!status.capabilities.chargingControl || model.settings.limit >= 100)
-                    .help("Below the limit, only charge again once the battery drops \(ChargeSettings.sailingGap)% under it")
+            let topUp = status.session.topUpActive
+            Button { model.toggleTopUp() } label: {
+                Text(topUp ? "Cancel Top Up" : "Top Up").frame(maxWidth: .infinity)
             }
+            .disabled(!topUp && !model.canTopUp)
+            .help("Charge to 100% once; the limit returns after you unplug")
         }
-    }
-
-    private func settingToggle(_ title: String, isOn: Bool, set: @escaping (Bool) -> Void) -> some View {
-        Toggle(title, isOn: Binding(get: { isOn }, set: set))
-            .toggleStyle(.switch)
-            .controlSize(.small)
+        // Explicit, so the borderless style of the panel's menu rows does not apply here.
+        .buttonStyle(.bordered)
+        .controlSize(.large)
     }
 }
 

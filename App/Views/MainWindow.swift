@@ -49,6 +49,9 @@ private struct BatteryPage: View {
             Section {
                 BatteryControls()
                     .padding(.vertical, 4)
+                if model.status != nil {
+                    BatterySettingsRows()
+                }
             }
             if let r = model.status?.reading {
                 Section {
