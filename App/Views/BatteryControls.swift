@@ -81,8 +81,6 @@ private struct PowerSummary: View {
         let power = reading.power
         let attached = (reading.chargerAttached ?? reading.adapterConnected) && power?.adapterWatts != nil
         HStack(spacing: 5) {
-            Image(systemName: attached ? "powerplug.fill" : "battery.75percent")
-                .foregroundStyle(attached ? .green : .secondary)
             if attached, let watts = power?.adapterWatts {
                 Text("\(watts) W adapter").help(power?.adapterName ?? "Adapter")
                 if let input = power?.inputPower {
