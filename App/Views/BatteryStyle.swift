@@ -65,11 +65,6 @@ enum BatteryStyle {
         }
     }
 
-    /// Whether the mode is actively moving charge, used to animate its icon.
-    static func isActive(_ mode: ChargeMode) -> Bool {
-        mode == .charging || mode == .toppingUp
-    }
-
     /// Monochrome menu bar symbol.
     static func symbol(for status: HelperStatus) -> String {
         switch status.mode {

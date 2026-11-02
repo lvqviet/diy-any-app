@@ -4,8 +4,8 @@ import SwiftUI
 extension View {
     /// Reports whether the hosting window is on screen and not fully covered.
     ///
-    /// Closed menu bar panels and windows stay alive in memory; repeating animations in them
-    /// keep rendering every display frame unless they are stopped while not visible.
+    /// Closed menu bar panels and windows stay alive in memory, so `onDisappear` is not a
+    /// reliable signal; the window's occlusion state is.
     func onWindowVisibilityChange(_ action: @escaping (Bool) -> Void) -> some View {
         background(WindowVisibilityReader(onChange: action))
     }

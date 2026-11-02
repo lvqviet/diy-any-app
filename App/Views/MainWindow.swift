@@ -21,6 +21,7 @@ struct MainWindow: View {
     }
 
     @State private var selection: Feature? = .battery
+    @Environment(BatteryModel.self) private var battery
 
     var body: some View {
         NavigationSplitView {
@@ -37,6 +38,7 @@ struct MainWindow: View {
             }
             // Opaque detail pane, so the translucent sidebar reads as lighter than the content.
             .background(Color(nsColor: .windowBackgroundColor))
+            .onWindowVisibilityChange { battery.setWindowVisible("main", $0) }
         }
     }
 }

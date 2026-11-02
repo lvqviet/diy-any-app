@@ -15,6 +15,11 @@ final class BatteryModel {
         case connecting
         case connected
         case error(String)
+
+        var isError: Bool {
+            if case .error = self { return true }
+            return false
+        }
     }
 
     private static let limitKey = "battery.limit"
@@ -36,6 +41,13 @@ final class BatteryModel {
     @ObservationIgnored private let client = HelperClient()
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var lastCapacityCheck: Date?
+    @ObservationIgnored private var workspaceObservers: [NSObjectProtocol] = []
+    /// Windows (panel, main window) currently on screen. Polling is fast only while one is.
+    @ObservationIgnored private var visibleWindows: Set<String> = []
+
+    /// Status refresh while a window shows details, and while only the menu bar label shows.
+    private static let visiblePollInterval: Duration = .seconds(3)
+    private static let hiddenPollInterval: Duration = .seconds(20)
 
     init() {
         let defaults = UserDefaults.standard
@@ -48,6 +60,7 @@ final class BatteryModel {
         client.onDisconnect = { [weak self] in
             Task { @MainActor in self?.handleDisconnect() }
         }
+        observeCompetingApps()
         start()
     }
 
@@ -56,10 +69,23 @@ final class BatteryModel {
     func start() {
         refreshRegistration()
         guard pollTask == nil else { return }
+        restartPolling()
+    }
+
+    /// Called by windows showing battery details; refreshes right away when one appears.
+    func setWindowVisible(_ id: String, _ visible: Bool) {
+        let wasVisible = !visibleWindows.isEmpty
+        if visible { visibleWindows.insert(id) } else { visibleWindows.remove(id) }
+        if wasVisible != !visibleWindows.isEmpty { restartPolling() }
+    }
+
+    private func restartPolling() {
+        pollTask?.cancel()
+        let interval = visibleWindows.isEmpty ? Self.hiddenPollInterval : Self.visiblePollInterval
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.poll()
-                try? await Task.sleep(for: .seconds(3))
+                do { try await Task.sleep(for: interval) } catch { return }
             }
         }
     }
@@ -169,11 +195,12 @@ final class BatteryModel {
 
     private func poll() async {
         await refreshSystemCapacity()
-        competingAppRunning = NSWorkspace.shared.runningApplications.contains {
-            Self.competingAppBundleIDs.contains($0.bundleIdentifier ?? "")
+        // Registration status is an XPC round trip to the system; only check it while not
+        // connected. A failing status call below falls back to checking it.
+        if helperState != .connected {
+            refreshRegistration()
+            guard helperState == .connecting || helperState.isError else { return }
         }
-        refreshRegistration()
-        guard client.registrationStatus == .enabled else { return }
         do {
             var current = try await client.status()
             if current.protocolVersion != HelperConstants.protocolVersion {
@@ -185,10 +212,28 @@ final class BatteryModel {
                 try await client.apply(settings)
                 current = try await client.status()
             }
-            status = current
-            helperState = .connected
+            if status != current { status = current }
+            if helperState != .connected { helperState = .connected }
         } catch {
             helperState = .error(error.localizedDescription)
+            refreshRegistration()
+        }
+    }
+
+    private func observeCompetingApps() {
+        let update: @MainActor () -> Void = { [weak self] in
+            let running = NSWorkspace.shared.runningApplications.contains {
+                Self.competingAppBundleIDs.contains($0.bundleIdentifier ?? "")
+            }
+            if self?.competingAppRunning != running { self?.competingAppRunning = running }
+        }
+        update()
+        let center = NSWorkspace.shared.notificationCenter
+        workspaceObservers = [NSWorkspace.didLaunchApplicationNotification,
+                              NSWorkspace.didTerminateApplicationNotification].map {
+            center.addObserver(forName: $0, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { update() }
+            }
         }
     }
 

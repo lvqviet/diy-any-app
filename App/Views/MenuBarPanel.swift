@@ -5,6 +5,7 @@ struct MenuBarPanel: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
     @State private var panelWindow: NSWindow?
+    @Environment(BatteryModel.self) private var battery
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -23,6 +24,7 @@ struct MenuBarPanel: View {
         .padding(14)
         .frame(width: 300)
         .background(WindowReader(window: $panelWindow))
+        .onWindowVisibilityChange { battery.setWindowVisible("panel", $0) }
     }
 
     private func openMainWindow() {
