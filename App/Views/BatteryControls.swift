@@ -141,19 +141,25 @@ private struct ActionButtons: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 if !model.settings.automaticDischarge {
                     let active = status.session.dischargeRequested
-                    Button(active ? "Stop Discharge" : "Discharge") { model.toggleDischarge() }
-                        .disabled(!active && !model.canStartDischarge)
-                        .help("Drain the battery to the limit while plugged in")
+                    Button { model.toggleDischarge() } label: {
+                        Text(active ? "Stop Discharge" : "Discharge").frame(maxWidth: .infinity)
+                    }
+                    .disabled(!active && !model.canStartDischarge)
+                    .help("Drain the battery to the limit while plugged in")
                 }
                 let topUp = status.session.topUpActive
-                Button(topUp ? "Cancel Top Up" : "Top Up") { model.toggleTopUp() }
-                    .disabled(!topUp && !model.canTopUp)
-                    .help("Charge to 100% once; the limit returns after you unplug")
+                Button { model.toggleTopUp() } label: {
+                    Text(topUp ? "Cancel Top Up" : "Top Up").frame(maxWidth: .infinity)
+                }
+                .disabled(!topUp && !model.canTopUp)
+                .help("Charge to 100% once; the limit returns after you unplug")
             }
-            .controlSize(.regular)
+            // Explicit, so the borderless style of the panel's menu rows does not apply here.
+            .buttonStyle(.bordered)
+            .controlSize(.large)
 
             if showsSettings {
                 settingToggle("Automatic Discharge", isOn: model.settings.automaticDischarge,

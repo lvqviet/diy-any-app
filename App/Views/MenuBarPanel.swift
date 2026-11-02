@@ -11,14 +11,15 @@ struct MenuBarPanel: View {
             BatteryControls(compact: true)
             Divider()
             Button("Open DIY Any App…") { openMainWindow() }
+                .buttonStyle(.borderless)
             Divider()
             Button { NSApp.terminate(nil) } label: {
                 Label("Quit", systemImage: "power")
             }
+            .buttonStyle(.borderless)
             .keyboardShortcut("q")
             .help("Quitting restores normal charging")
         }
-        .buttonStyle(.borderless)
         .padding(14)
         .frame(width: 300)
         .background(WindowReader(window: $panelWindow))
