@@ -19,6 +19,8 @@ settings:
 packages:
   BatteryCore:
     path: Packages/BatteryCore
+  DevCore:
+    path: Packages/DevCore
 
 targets:
   DIYAnyApp:
@@ -33,6 +35,7 @@ targets:
             subpath: Contents/Library/LaunchDaemons
     dependencies:
       - package: BatteryCore
+      - package: DevCore
       - target: DIYAnyAppHelper
         copy:
           destination: executables

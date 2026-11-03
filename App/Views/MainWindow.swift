@@ -6,16 +6,20 @@ struct MainWindow: View {
     static let id = "main"
 
     enum Feature: String, CaseIterable, Identifiable {
-        case battery
+        case battery, ports, devUtils
         var id: String { rawValue }
         var title: String {
             switch self {
             case .battery: return "Battery"
+            case .ports: return "Ports"
+            case .devUtils: return "Dev Utils"
             }
         }
         var symbol: String {
             switch self {
             case .battery: return "battery.75percent"
+            case .ports: return "network"
+            case .devUtils: return "wrench.and.screwdriver"
             }
         }
     }
@@ -34,6 +38,10 @@ struct MainWindow: View {
                 switch selection {
                 case .battery, .none:
                     BatteryPage()
+                case .ports:
+                    PortsPage()
+                case .devUtils:
+                    DevUtilsPage()
                 }
             }
             // Opaque detail pane, so the translucent sidebar reads as lighter than the content.

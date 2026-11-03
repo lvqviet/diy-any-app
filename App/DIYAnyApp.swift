@@ -3,11 +3,22 @@ import SwiftUI
 @main
 struct DIYAnyApp: App {
     @State private var battery = BatteryModel()
+    @State private var ports = PortsModel()
+
+    init() {
+        // Dev Utils input is code: no smart quotes, dashes or autocorrect.
+        UserDefaults.standard.register(defaults: [
+            "NSAutomaticQuoteSubstitutionEnabled": false,
+            "NSAutomaticDashSubstitutionEnabled": false,
+            "NSAutomaticSpellingCorrectionEnabled": false,
+        ])
+    }
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarPanel()
                 .environment(battery)
+                .environment(ports)
         } label: {
             MenuBarLabel(battery: battery)
         }
@@ -16,6 +27,7 @@ struct DIYAnyApp: App {
         Window("DIY Any App", id: MainWindow.id) {
             MainWindow()
                 .environment(battery)
+                .environment(ports)
                 .frame(minWidth: 680, minHeight: 440)
         }
         .windowResizability(.contentMinSize)

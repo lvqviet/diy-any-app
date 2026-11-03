@@ -11,6 +11,8 @@ struct MenuBarPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             BatteryControls(compact: true)
             Divider()
+            PortsPanelSection()
+            Divider()
             Button("Open DIY Any App…") { openMainWindow() }
                 .buttonStyle(.borderless)
             Divider()

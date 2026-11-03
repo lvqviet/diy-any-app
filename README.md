@@ -19,6 +19,20 @@ Behavior:
 - If the control loop fails 3 times in a row (about 15 seconds), normal charging is restored so a stale state such as adapter power cut during a discharge cannot persist. Control resumes automatically once reads succeed again.
 - While charging toward the limit or discharging, idle sleep is held off. If the Mac is put to sleep anyway, charging is paused and adapter power restored right before sleep, so the limit is never exceeded and the battery never drains while asleep.
 
+### Ports
+
+- Lists TCP ports in LISTEN state with process name, PID, bound address and the process's working directory (usually the project folder). Read directly from the kernel via libproc.
+- **Stop** sends SIGTERM; if the process still holds its port after 3 seconds, **Force Kill** (SIGKILL) is offered.
+- Open `http://localhost:<port>`, copy PID or URL, show the project folder in Finder or Terminal.
+- Apps and macOS services (AirPlay, Spotify, editor helpers) are hidden by default; a search also matches them.
+- Only this user's processes are listed. Ports held by other users or root (e.g. `sudo npm start`) are not readable without root and are deliberately not handled.
+- The menu bar panel shows dev servers with a stop button; the main window shows the full list.
+- Scans every 2 seconds, only while the panel or the Ports page is visible.
+
+### Dev Utils (inspired by DevUtils, DevToys)
+
+JSON format/minify (keeps key order and number spelling), Base64 and URL encode/decode, JWT decode (signature not verified), Unix timestamp to date and back, MD5/SHA-1/SHA-256/SHA-512, UUID. Output updates while typing.
+
 ## Architecture
 
 | Part | Path | Role |
@@ -26,6 +40,7 @@ Behavior:
 | App | `App/` | SwiftUI menu bar panel + main window, runs as the user |
 | Helper | `Helper/` | Root launchd daemon registered via `SMAppService`; the only part that writes SMC keys |
 | BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, pure charge policy, XPC protocol (unit-tested) |
+| DevCore | `Packages/DevCore/` | Port scanner (libproc) and Dev Utils conversions (unit-tested) |
 
 App and helper talk over XPC (`com.diyanyapp.me.helper`); each side checks the other's code signature (team `U8GCXBC6Q3`).
 
