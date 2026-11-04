@@ -4,6 +4,7 @@ import SwiftUI
 struct DIYAnyApp: App {
     @State private var battery = BatteryModel()
     @State private var ports = PortsModel()
+    @State private var keepAwake = KeepAwakeModel()
 
     init() {
         // Dev Utils input is code: no smart quotes, dashes or autocorrect.
@@ -19,8 +20,9 @@ struct DIYAnyApp: App {
             MenuBarPanel()
                 .environment(battery)
                 .environment(ports)
+                .environment(keepAwake)
         } label: {
-            MenuBarLabel(battery: battery)
+            MenuBarLabel(battery: battery, keepAwake: keepAwake)
         }
         .menuBarExtraStyle(.window)
 
@@ -28,6 +30,7 @@ struct DIYAnyApp: App {
             MainWindow()
                 .environment(battery)
                 .environment(ports)
+                .environment(keepAwake)
                 .frame(minWidth: 680, minHeight: 440)
         }
         .windowResizability(.contentMinSize)
@@ -36,8 +39,18 @@ struct DIYAnyApp: App {
 
 private struct MenuBarLabel: View {
     let battery: BatteryModel
+    let keepAwake: KeepAwakeModel
 
     var body: some View {
+        HStack(spacing: 3) {
+            if keepAwake.isActive {
+                Image(systemName: "cup.and.saucer.fill")
+            }
+            batteryLabel
+        }
+    }
+
+    @ViewBuilder private var batteryLabel: some View {
         if let status = battery.status, let percent = status.reading?.percent {
             HStack(spacing: 3) {
                 Image(systemName: BatteryStyle.symbol(for: status))

@@ -6,11 +6,12 @@ struct MainWindow: View {
     static let id = "main"
 
     enum Feature: String, CaseIterable, Identifiable {
-        case battery, ports, devUtils
+        case battery, keepAwake, ports, devUtils
         var id: String { rawValue }
         var title: String {
             switch self {
             case .battery: return "Battery"
+            case .keepAwake: return "Keep Awake"
             case .ports: return "Ports"
             case .devUtils: return "Dev Utils"
             }
@@ -18,6 +19,7 @@ struct MainWindow: View {
         var symbol: String {
             switch self {
             case .battery: return "battery.75percent"
+            case .keepAwake: return "cup.and.saucer"
             case .ports: return "network"
             case .devUtils: return "wrench.and.screwdriver"
             }
@@ -38,6 +40,8 @@ struct MainWindow: View {
                 switch selection {
                 case .battery, .none:
                     BatteryPage()
+                case .keepAwake:
+                    KeepAwakePage()
                 case .ports:
                     PortsPage()
                 case .devUtils:

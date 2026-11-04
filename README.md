@@ -19,6 +19,12 @@ Behavior:
 - If the control loop fails 3 times in a row (about 15 seconds), normal charging is restored so a stale state such as adapter power cut during a discharge cannot persist. Control resumes automatically once reads succeed again.
 - While charging toward the limit or discharging, idle sleep is held off. If the Mac is put to sleep anyway, charging is paused and adapter power restored right before sleep, so the limit is never exceeded and the battery never drains while asleep.
 
+### Keep Awake (inspired by Amphetamine, `caffeinate -d`)
+
+- Keeps the display on and the Mac from idle sleep for 15 min, 30 min, 1 h, 2 h, 4 h or until stopped. A cup icon shows in the menu bar while active.
+- Safety: stops by itself, and cannot be started, on battery at 20% or below, or when macOS reports a critical thermal state. Quitting or a crash releases it (macOS drops the assertion with the process).
+- Closing the lid or choosing Sleep still sleeps the Mac, same as `caffeinate -d`. Time asleep counts toward the duration.
+
 ### Ports
 
 - Lists TCP ports in LISTEN state with process name, PID, bound address and the process's working directory (usually the project folder). Read directly from the kernel via libproc.
@@ -40,7 +46,7 @@ JSON format/minify (keeps key order and number spelling), Base64 and URL encode/
 | App | `App/` | SwiftUI menu bar panel + main window, runs as the user |
 | Helper | `Helper/` | Root launchd daemon registered via `SMAppService`; the only part that writes SMC keys |
 | BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, pure charge policy, XPC protocol (unit-tested) |
-| DevCore | `Packages/DevCore/` | Port scanner (libproc) and Dev Utils conversions (unit-tested) |
+| DevCore | `Packages/DevCore/` | Port scanner (libproc), Dev Utils conversions, Keep Awake assertion and safety policy (unit-tested) |
 
 App and helper talk over XPC (`com.diyanyapp.me.helper`); each side checks the other's code signature (team `U8GCXBC6Q3`).
 

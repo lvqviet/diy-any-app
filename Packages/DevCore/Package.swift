@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "DevCore", targets: ["DevCore"]),
     ],
     targets: [
-        .target(name: "DevCore"),
+        .target(name: "DevCore", linkerSettings: [.linkedFramework("IOKit")]),
         .testTarget(name: "DevCoreTests", dependencies: ["DevCore"]),
     ]
 )

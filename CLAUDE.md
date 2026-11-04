@@ -14,6 +14,9 @@ helper debugging. Read it before changing battery behavior. This file covers wha
 - Shipped: **Ports** (list listening ports of this user's processes, stop / force kill) and
   **Dev Utils** (JSON, Base64, URL, JWT, timestamp, hash, UUID). Logic in `Packages/DevCore`.
   Root-owned processes are out of scope by owner decision: no kill via the helper.
+- Shipped: **Keep Awake** (`caffeinate -d`, preset durations). Owner requirement: a forgotten
+  session must not drain the battery or harm the Mac, so `KeepAwakePolicy` stops it on battery
+  at 20% and at critical thermal state. Keep these guards.
 - Next features: not decided yet. Ask the owner which app/feature comes next; do not guess.
 - A new feature gets a case in `MainWindow.Feature` (sidebar entry + page). Keep each feature's
   core logic in a testable package like `Packages/BatteryCore`, and its UI in `App/Views/`.
@@ -29,7 +32,8 @@ helper debugging. Read it before changing battery behavior. This file covers wha
 | `App/Views/` | `MenuBarPanel` (compact), `MainWindow` (sidebar + form), shared `BatteryControls`, `BatterySettingsRows` (window only), `BatteryRing`, `BatteryStyle`, `WindowVisibility` |
 | `Helper/Sources/` | Root launchd daemon: `ChargeController` (5 s control loop), `XPCServer`, `PowerWatcher` (sleep/wake), `DebugCLI` |
 | `Packages/BatteryCore/` | SMC client, `BatteryReader`, pure `ChargePolicy.decide`, `FailSafe`, XPC protocol, with unit tests |
-| `Packages/DevCore/` | `PortScanner` (libproc), `DevTool` conversions, with unit tests |
+| `Packages/DevCore/` | `PortScanner` (libproc), `DevTool` conversions, `DisplaySleepAssertion` + `KeepAwakePolicy`, with unit tests |
+| `App/KeepAwakeModel.swift` | Keep Awake state: assertion, end timer, safety checks on power source / thermal / wake notifications |
 | `App/PortsModel.swift` | Ports state: scans every 2 s only while the panel or Ports page is visible, SIGTERM / SIGKILL |
 | `scripts/` | `install.sh` (Release build into /Applications), `dev-helper.sh` (helper CLI as root), `make-app-icon.swift` |
 
