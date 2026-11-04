@@ -62,7 +62,7 @@ private struct VersionFooter: View {
         HStack(spacing: 8) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 24, height: 24)
+                .frame(width: 32, height: 32)
                 .accessibilityHidden(true)
             Text(version)
                 .font(.caption)
