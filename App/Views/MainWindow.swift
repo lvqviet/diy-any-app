@@ -35,6 +35,7 @@ struct MainWindow: View {
                 Label(feature.title, systemImage: feature.symbol).tag(feature)
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
+            .safeAreaInset(edge: .bottom) { VersionFooter() }
         } detail: {
             Group {
                 switch selection {
@@ -52,6 +53,33 @@ struct MainWindow: View {
             .background(Color(nsColor: .windowBackgroundColor))
             .onWindowVisibilityChange { battery.setWindowVisible("main", $0) }
         }
+    }
+}
+
+/// App icon and version at the bottom of the sidebar.
+private struct VersionFooter: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            Text(version)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .textSelection(.enabled)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Version \(version) (\(build))"
     }
 }
 
@@ -111,7 +139,6 @@ private struct BatteryPage: View {
             }
             Section {
                 LaunchAtLoginToggle()
-                LabeledContent("Version", value: appVersion)
             } header: {
                 Label("General", systemImage: "gearshape")
             }
@@ -140,13 +167,6 @@ private struct BatteryPage: View {
     private func rawCapacity(_ r: BatteryReading) -> String {
         guard let max = r.maxCapacity, let design = r.designCapacity else { return "\(r.health)%" }
         return "\(r.health)% (\(max) / \(design) mAh)"
-    }
-
-    private var appVersion: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(version) (\(build))"
     }
 
     private var helperText: String {
