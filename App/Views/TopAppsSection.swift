@@ -15,7 +15,8 @@ struct TopAppsSection: View {
                 Text(model.measuring ? "Measuring…" : "No app is using noticeable power.")
                     .foregroundStyle(.secondary)
             }
-            ForEach(model.apps) { TopAppRow(app: $0) }
+            let maxWatts = model.apps.map(\.watts).max() ?? 0
+            ForEach(model.apps) { TopAppRow(app: $0, share: maxWatts > 0 ? $0.watts / maxWatts : 0) }
         } header: {
             Label("Top energy use", systemImage: "flame")
         } footer: {
@@ -30,22 +31,32 @@ struct TopAppsSection: View {
 private struct TopAppRow: View {
     @Environment(TopAppsModel.self) private var model
     let app: AppUsage
+    /// Power relative to the top app, for the bar.
+    let share: Double
 
     var body: some View {
         let force = model.unresponsive.contains(app.id)
         HStack(spacing: 10) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: app.appPath ?? "/bin/sh"))
                 .resizable()
-                .frame(width: 20, height: 20)
+                .frame(width: 24, height: 24)
                 .accessibilityHidden(true)
-            Text(app.name)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(app.appPath ?? app.name)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(cpu)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .help(app.appPath ?? app.name)
             Spacer()
-            Text(String(format: "%.0f%% CPU", app.cpuPercent))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            ProgressView(value: share)
+                .tint(.orange)
+                .frame(width: 120)
+                .help("Power use relative to the top app")
+                .accessibilityLabel("Power use")
             Text(PowerFormat.watts(app.watts))
                 .monospacedDigit()
                 .frame(minWidth: 48, alignment: .trailing)
@@ -57,5 +68,11 @@ private struct TopAppRow: View {
                         : "Quit \(app.name)")
         }
         .padding(.vertical, 2)
+    }
+
+    /// Share of the whole machine (all cores), so it stays within 0–100%.
+    private var cpu: String {
+        let percent = app.cpuPercent / Double(ProcessInfo.processInfo.activeProcessorCount)
+        return percent < 1 ? "<1% CPU" : String(format: "%.0f%% CPU", percent)
     }
 }

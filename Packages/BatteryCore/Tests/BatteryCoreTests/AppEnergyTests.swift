@@ -45,4 +45,11 @@ final class AppEnergyTests: XCTestCase {
         XCTAssertEqual(top.map(\.name), ["p7", "p6", "p5", "p4", "p3"])
         XCTAssertEqual(top[0].watts, 3.5, accuracy: 0.001)
     }
+
+    func testCPUDecidesBelowDisplayedWatts() {
+        let before: [pid_t: ProcessSample] = [1: s(1, "decoder", nj: 0, ns: 0), 2: s(2, "iTerm", nj: 0, ns: 0)]
+        let after: [pid_t: ProcessSample] = [1: s(1, "decoder", nj: 40_000_000, ns: 20_000_000),
+                                             2: s(2, "iTerm", nj: 10_000_000, ns: 70_000_000)]
+        XCTAssertEqual(AppEnergy.top(previous: before, current: after, interval: 1).map(\.name), ["iTerm", "decoder"])
+    }
 }

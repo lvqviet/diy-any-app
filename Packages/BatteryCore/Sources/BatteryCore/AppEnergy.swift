@@ -87,9 +87,15 @@ public enum AppEnergy {
                      watts: Double(t.nj) / 1e9 / interval, cpuPercent: Double(t.ns) / 1e9 / interval * 100)
         }
         .filter { $0.watts >= 0.05 || $0.cpuPercent >= 1 }
-        .sorted { ($0.watts, $0.cpuPercent) > ($1.watts, $1.cpuPercent) }
+        .sorted(by: ranksHigher)
         .prefix(limit)
         .map { $0 }
+    }
+
+    /// Watts at the 0.1 W the UI shows; below that the energy counter is noise, so CPU decides.
+    private static func ranksHigher(_ a: AppUsage, _ b: AppUsage) -> Bool {
+        let wa = (a.watts * 10).rounded(), wb = (b.watts * 10).rounded()
+        return wa != wb ? wa > wb : a.cpuPercent > b.cpuPercent
     }
 
     /// `/Applications/Google Chrome.app/Contents/Frameworks/…/Helper.app/…` → `/Applications/Google Chrome.app`.
