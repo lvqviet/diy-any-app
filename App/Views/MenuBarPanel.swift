@@ -28,6 +28,8 @@ struct MenuBarPanel: View {
         .padding(14)
         .frame(width: 300)
         .background(WindowReader(window: $panelWindow))
+        // Fade out on close like system menus; MenuBarExtra panels disappear instantly by default.
+        .onChange(of: panelWindow) { _, window in window?.animationBehavior = .utilityWindow }
         .onWindowVisibilityChange { battery.setWindowVisible("panel", $0) }
     }
 
