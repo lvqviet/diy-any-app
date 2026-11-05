@@ -5,6 +5,7 @@ struct DIYAnyApp: App {
     @State private var battery = BatteryModel()
     @State private var ports = PortsModel()
     @State private var keepAwake = KeepAwakeModel()
+    @State private var topApps = TopAppsModel()
 
     init() {
         // Dev Utils input is code: no smart quotes, dashes or autocorrect.
@@ -29,6 +30,7 @@ struct DIYAnyApp: App {
         Window("DIY Any App", id: MainWindow.id) {
             MainWindow()
                 .environment(battery)
+                .environment(topApps)
                 .environment(ports)
                 .environment(keepAwake)
                 .frame(minWidth: 680, minHeight: 440)

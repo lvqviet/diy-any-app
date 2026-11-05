@@ -12,6 +12,7 @@ Personal macOS menu bar app that combines features of paid apps into one native 
 - **Top Up**: charge to 100% once; the limit returns as soon as the adapter is unplugged.
 - **Sailing Mode**: below the limit, charging only resumes once the battery drops more than 5% under it (e.g. limit 80% charges again below 75%), then charges back to the limit. Avoids many tiny charge cycles while plugged in.
 - **Power and health**: adapter name and negotiated wattage, power drawn from the adapter, battery charge/discharge power, voltage, cycle count, and battery health both as macOS reports it (Maximum Capacity) and as raw full-charge / design capacity in mAh.
+- **Top energy use**: the 5 apps of this user drawing the most power right now (watts from the kernel's per-process energy counters, plus CPU %), helper processes counted toward their app. **Quit** asks the app to quit (SIGTERM for command line tools); if it is still running after 3 seconds, **Force Kill** is offered. Samples every 3 seconds, only while the Battery page is visible. System and root processes are not included.
 
 Behavior:
 
@@ -45,7 +46,7 @@ JSON format/minify (keeps key order and number spelling), Base64 and URL encode/
 | --- | --- | --- |
 | App | `App/` | SwiftUI menu bar panel + main window, runs as the user |
 | Helper | `Helper/` | Root launchd daemon registered via `SMAppService`; the only part that writes SMC keys |
-| BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, pure charge policy, XPC protocol (unit-tested) |
+| BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, per-app energy sampler, pure charge policy, XPC protocol (unit-tested) |
 | DevCore | `Packages/DevCore/` | Port scanner (libproc), Dev Utils conversions, Keep Awake assertion and safety policy (unit-tested) |
 
 App and helper talk over XPC (`com.diyanyapp.me.helper`); each side checks the other's code signature (team `U8GCXBC6Q3`).

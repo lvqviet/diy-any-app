@@ -137,6 +137,7 @@ private struct BatteryPage: View {
                     Label("Power", systemImage: "bolt.circle")
                 }
             }
+            TopAppsSection()
             Section {
                 LaunchAtLoginToggle()
             } header: {
