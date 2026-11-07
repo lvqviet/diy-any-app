@@ -16,6 +16,8 @@ final class SensorsModel {
     static let window: TimeInterval = 3600
     private static let backgroundInterval: Duration = .seconds(15)
     private static let visibleInterval: Duration = .seconds(5)
+    /// How long a part without a reading keeps showing its previous value.
+    private static let carryOver: TimeInterval = 60
 
     private(set) var history: [Sample] = []
     private(set) var fanSpeeds: [Double] = []
@@ -26,6 +28,7 @@ final class SensorsModel {
     @ObservationIgnored private let sensors: ThermalSensors?
     @ObservationIgnored private var visibleWindows: Set<String> = []
     @ObservationIgnored private var sampleTask: Task<Void, Never>?
+    @ObservationIgnored private var lastSeen: [ThermalPart: (date: Date, reading: ThermalReading)] = [:]
 
     init() {
         do {
@@ -60,9 +63,15 @@ final class SensorsModel {
 
     private func sample() {
         guard let sensors else { return }
-        // About 25 SMC reads, well under a millisecond, so this stays on the main actor.
+        // About 75 SMC reads, well under a millisecond, so this stays on the main actor.
         let now = Date()
-        history.append(Sample(date: now, values: sensors.read()))
+        var values = sensors.read()
+        for (part, reading) in values { lastSeen[part] = (now, reading) }
+        // A power-gated GPU briefly reports 0 °C on all its sensors; keep the last real reading over that gap.
+        for (part, seen) in lastSeen where values[part] == nil && now.timeIntervalSince(seen.date) < Self.carryOver {
+            values[part] = seen.reading
+        }
+        history.append(Sample(date: now, values: values))
         history.removeAll { now.timeIntervalSince($0.date) > Self.window }
         fanSpeeds = sensors.fanSpeeds()
         thermalState = ProcessInfo.processInfo.thermalState

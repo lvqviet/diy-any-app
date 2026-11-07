@@ -2,7 +2,7 @@ import Foundation
 
 /// A group of SMC temperature sensors shown as one line on the chart.
 public enum ThermalPart: String, CaseIterable, Identifiable, Sendable {
-    case cpu, gpu, ssd, battery
+    case cpu, gpu, battery
 
     public var id: String { rawValue }
 
@@ -10,7 +10,6 @@ public enum ThermalPart: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .cpu: return "CPU"
         case .gpu: return "GPU"
-        case .ssd: return "SSD"
         case .battery: return "Battery"
         }
     }
@@ -21,7 +20,6 @@ public enum ThermalPart: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .cpu: return ["Tp0", "Tp1", "Te0"]   // performance and efficiency cores
         case .gpu: return ["Tg0", "Tg1"]
-        case .ssd: return ["TH0"]                  // NAND
         case .battery: return ["TB0", "TB1", "TB2"]
         }
     }

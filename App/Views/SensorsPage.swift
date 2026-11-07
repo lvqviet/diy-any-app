@@ -93,10 +93,13 @@ struct SensorsPage: View {
                     .interpolationMethod(.monotone)
             }
             if let hovered {
+                // Tooltip beside the line, on the side with more room, so it never covers the line.
+                let onRight = hovered.date.timeIntervalSinceNow < -SensorsModel.window / 2
                 RuleMark(x: .value("Time", hovered.date))
                     .foregroundStyle(Color.secondary.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .plot))) {
+                    .annotation(position: onRight ? .trailing : .leading, alignment: .top, spacing: 8,
+                                overflowResolution: .init(x: .disabled, y: .fit(to: .plot))) {
                         tooltip(hovered)
                     }
             }
@@ -175,8 +178,7 @@ struct SensorsPage: View {
         let (light, dark): (UInt32, UInt32) = switch part {
         case .cpu: (0x2a78d6, 0x3987e5)
         case .gpu: (0xeb6834, 0xd95926)
-        case .ssd: (0x1baf7a, 0x199e70)
-        case .battery: (0xeda100, 0xc98500)
+        case .battery: (0x1baf7a, 0x199e70)
         }
         return Color(nsColor: NSColor(name: nil) { appearance in
             let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
