@@ -20,6 +20,13 @@ Behavior:
 - If the control loop fails 3 times in a row (about 15 seconds), normal charging is restored so a stale state such as adapter power cut during a discharge cannot persist. Control resumes automatically once reads succeed again.
 - While charging toward the limit or discharging, idle sleep is held off. If the Mac is put to sleep anyway, charging is paused and adapter power restored right before sleep, so the limit is never exceeded and the battery never drains while asleep.
 
+### Sensors
+
+- Chart of the last hour with one line each for CPU, GPU, SSD and battery: the hottest SMC temperature sensor of that part. Hover for exact values.
+- Current temperatures, macOS thermal state and fan speeds.
+- Sampled every 15 seconds in the background, so the chart has history when opened, and every 5 seconds while the page is open. Read-only SMC access from the app, no root needed.
+- Sensor keys are found by probing the Apple Silicon prefixes (`Tp0`, `Te0`, `Tg0`, `TH0`, `TB0`...); verified on M3 Pro only.
+
 ### Keep Awake (inspired by Amphetamine, `caffeinate -d`)
 
 - Keeps the display on and the Mac from idle sleep for 15 min, 30 min, 1 h, 2 h, 4 h or until stopped. A cup icon shows in the menu bar while active.
@@ -45,8 +52,8 @@ JSON format/minify (keeps key order and number spelling), Base64 and URL encode/
 | Part | Path | Role |
 | --- | --- | --- |
 | App | `App/` | SwiftUI menu bar panel + main window, runs as the user |
-| Helper | `Helper/` | Root launchd daemon registered via `SMAppService`; the only part that writes SMC keys |
-| BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, per-app energy sampler, pure charge policy, XPC protocol (unit-tested) |
+| Helper | `Helper/` | Root launchd daemon registered via `SMAppService`; the only part that writes SMC keys (the app only reads temperature and fan keys) |
+| BatteryCore | `Packages/BatteryCore/` | SMC client, battery reader, per-app energy sampler, temperature sensors, pure charge policy, XPC protocol (unit-tested) |
 | DevCore | `Packages/DevCore/` | Port scanner (libproc), Dev Utils conversions, Keep Awake assertion and safety policy (unit-tested) |
 
 App and helper talk over XPC (`com.diyanyapp.me.helper`); each side checks the other's code signature (team `U8GCXBC6Q3`).

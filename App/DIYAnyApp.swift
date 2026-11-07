@@ -6,6 +6,7 @@ struct DIYAnyApp: App {
     @State private var ports = PortsModel()
     @State private var keepAwake = KeepAwakeModel()
     @State private var topApps = TopAppsModel()
+    @State private var sensors = SensorsModel()
 
     init() {
         // Dev Utils input is code: no smart quotes, dashes or autocorrect.
@@ -31,6 +32,7 @@ struct DIYAnyApp: App {
             MainWindow()
                 .environment(battery)
                 .environment(topApps)
+                .environment(sensors)
                 .environment(ports)
                 .environment(keepAwake)
                 .frame(minWidth: 680, minHeight: 440)
