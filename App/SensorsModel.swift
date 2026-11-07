@@ -9,7 +9,7 @@ import Observation
 final class SensorsModel {
     struct Sample: Identifiable {
         let date: Date
-        let values: [ThermalPart: Double]
+        let values: [ThermalPart: ThermalReading]
         var id: Date { date }
     }
 

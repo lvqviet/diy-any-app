@@ -20,14 +20,14 @@ struct SensorsPage: View {
                 } header: {
                     Label("Temperature, last hour", systemImage: "thermometer.medium")
                 } footer: {
-                    Text("Each line is the hottest sensor of that part. Sampled every 15 s in the background, every 5 s while this page is open.")
+                    Text("Each line is the average of that part's sensors. Sampled every 15 s in the background, every 5 s while this page is open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Section {
                     ForEach(ThermalPart.allCases) { part in
                         LabeledContent {
-                            Text(model.latest?.values[part].map(Self.celsius) ?? "–")
+                            Text(model.latest?.values[part].map(Self.nowText) ?? "–")
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         } label: {
@@ -71,7 +71,7 @@ struct SensorsPage: View {
     private var points: [Point] {
         model.history.flatMap { sample in
             ThermalPart.allCases.compactMap { part in
-                sample.values[part].map { Point(date: sample.date, part: part, value: $0) }
+                sample.values[part].map { Point(date: sample.date, part: part, value: $0.average) }
             }
         }
     }
@@ -96,7 +96,7 @@ struct SensorsPage: View {
                 RuleMark(x: .value("Time", hovered.date))
                     .foregroundStyle(Color.secondary.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .plot))) {
                         tooltip(hovered)
                     }
             }
@@ -106,13 +106,14 @@ struct SensorsPage: View {
     private var chart: some View {
         let titles = ThermalPart.allCases.map(\.title)
         let colors = ThermalPart.allCases.map(Self.color)
+        let domain = Date(timeIntervalSinceNow: -SensorsModel.window)...Date()
         return chartContent
         .chartForegroundStyleScale(domain: titles, range: colors)
         .chartLegend(position: .top, alignment: .leading)
         .chartYAxisLabel("°C")
-        .chartXScale(domain: Date(timeIntervalSinceNow: -SensorsModel.window)...Date())
+        .chartXScale(domain: domain)
         .chartXAxis {
-            AxisMarks(values: .stride(by: .minute, count: 10)) {
+            AxisMarks(values: Self.timeTicks(domain)) {
                 AxisGridLine().foregroundStyle(.quaternary)
                 AxisValueLabel(format: .dateTime.hour().minute())
             }
@@ -139,7 +140,7 @@ struct SensorsPage: View {
             Text(sample.date.formatted(date: .omitted, time: .standard))
                 .font(.caption.weight(.semibold))
             ForEach(ThermalPart.allCases) { part in
-                if let value = sample.values[part] {
+                if let value = sample.values[part]?.average {
                     HStack(spacing: 6) {
                         Circle().fill(Self.color(part)).frame(width: 7, height: 7)
                         Text(part.title)
@@ -156,6 +157,18 @@ struct SensorsPage: View {
     }
 
     static func celsius(_ value: Double) -> String { String(format: "%.0f °C", value) }
+
+    static func nowText(_ reading: ThermalReading) -> String {
+        "\(celsius(reading.average)) · hottest \(celsius(reading.hottest))"
+    }
+
+    /// Every 10 minutes, leaving out ticks near either end whose label would be cut off.
+    static func timeTicks(_ domain: ClosedRange<Date>) -> [Date] {
+        let step: TimeInterval = 600, margin: TimeInterval = 240
+        let first = ((domain.lowerBound.timeIntervalSince1970 + margin) / step).rounded(.up) * step
+        return stride(from: first, through: domain.upperBound.timeIntervalSince1970 - margin, by: step)
+            .map(Date.init(timeIntervalSince1970:))
+    }
 
     /// Categorical palette, checked for color-blind separation; each mode has its own steps.
     static func color(_ part: ThermalPart) -> Color {

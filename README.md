@@ -22,8 +22,8 @@ Behavior:
 
 ### Sensors
 
-- Chart of the last hour with one line each for CPU, GPU, SSD and battery: the hottest SMC temperature sensor of that part. Hover for exact values.
-- Current temperatures, macOS thermal state and fan speeds.
+- Chart of the last hour with one line each for CPU, GPU, SSD and battery: the average of that part's SMC temperature sensors. Hover for exact values.
+- Current temperatures (average and hottest sensor; the hottest one is what triggers throttling), macOS thermal state and fan speeds.
 - Sampled every 15 seconds in the background, so the chart has history when opened, and every 5 seconds while the page is open. Read-only SMC access from the app, no root needed.
 - Sensor keys are found by probing the Apple Silicon prefixes (`Tp0`, `Te0`, `Tg0`, `TH0`, `TB0`...); verified on M3 Pro only.
 

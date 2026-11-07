@@ -2,13 +2,13 @@ import XCTest
 @testable import BatteryCore
 
 final class ThermalSensorsTests: XCTestCase {
-    func testSummarizeTakesHighestPlausibleReading() {
-        let keys: [ThermalPart: [String]] = [.cpu: ["Tp05", "Tp0D", "Te05"], .gpu: ["Tg05"], .ssd: ["TH0x"], .battery: []]
-        let readings = ["Tp05": 50.3, "Tp0D": 57.5, "Te05": 44.2, "Tg05": 0, "TH0x": 33.5]
+    func testSummarizeAveragesPlausibleReadings() {
+        let keys: [ThermalPart: [String]] = [.cpu: ["Tp05", "Tp0D", "Te05", "Te0P"], .gpu: ["Tg05"], .ssd: ["TH0x"], .battery: []]
+        let readings = ["Tp05": 50, "Tp0D": 60, "Te05": 40, "Te0P": 0, "Tg05": 0, "TH0x": 33.5]
         let result = ThermalPart.summarize(readings, keys: keys)
-        XCTAssertEqual(result[.cpu], 57.5)
+        XCTAssertEqual(result[.cpu], ThermalReading(average: 50, hottest: 60), "the 0 °C placeholder is ignored")
         XCTAssertNil(result[.gpu], "a 0 °C placeholder is not a reading")
-        XCTAssertEqual(result[.ssd], 33.5)
+        XCTAssertEqual(result[.ssd], ThermalReading(average: 33.5, hottest: 33.5))
         XCTAssertNil(result[.battery])
     }
 

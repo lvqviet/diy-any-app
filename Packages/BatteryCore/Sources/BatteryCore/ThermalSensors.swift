@@ -29,15 +29,24 @@ public enum ThermalPart: String, CaseIterable, Identifiable, Sendable {
     /// Readings outside this range come from unused or placeholder sensors.
     static let plausible = 5.0...130.0
 
-    /// Highest plausible reading per part; parts without one are left out.
-    public static func summarize(_ readings: [String: Double], keys: [ThermalPart: [String]]) -> [ThermalPart: Double] {
-        var result: [ThermalPart: Double] = [:]
+    /// Average and hottest plausible reading per part; parts without one are left out.
+    public static func summarize(_ readings: [String: Double], keys: [ThermalPart: [String]]) -> [ThermalPart: ThermalReading] {
+        var result: [ThermalPart: ThermalReading] = [:]
         for (part, partKeys) in keys {
             let values = partKeys.compactMap { readings[$0] }.filter { plausible.contains($0) }
-            if let max = values.max() { result[part] = max }
+            if let max = values.max() {
+                result[part] = ThermalReading(average: values.reduce(0, +) / Double(values.count), hottest: max)
+            }
         }
         return result
     }
+}
+
+/// One part's temperature in °C. The average follows the part as a whole; the hottest sensor
+/// jumps whenever a single core gets work, but it is the one that triggers throttling.
+public struct ThermalReading: Equatable, Sendable {
+    public let average: Double
+    public let hottest: Double
 }
 
 /// Reads temperatures from the SMC. Read-only: works as a normal user, never writes keys.
@@ -62,7 +71,7 @@ public final class ThermalSensors {
         keys = found
     }
 
-    public func read() -> [ThermalPart: Double] {
+    public func read() -> [ThermalPart: ThermalReading] {
         var readings: [String: Double] = [:]
         for key in keys.values.joined() {
             if let value = float(key) { readings[key] = value }
